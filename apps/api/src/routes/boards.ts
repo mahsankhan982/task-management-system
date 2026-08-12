@@ -17,7 +17,7 @@ router.get("/", async (_req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { name, description, team_id, created_by } = req.body;
+    const { name, description, team_id } = req.body;
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return res.status(400).json({ success: false, message: "Board name is required" });
@@ -25,7 +25,7 @@ router.post("/", async (req, res) => {
 
     const result = await db.query(
       "INSERT INTO boards (name, description, team_id, created_by) VALUES ($1, $2, $3, $4) RETURNING *",
-      [name.trim(), description ?? null, team_id ?? null, created_by ?? null]
+      [name.trim(), description ?? null, team_id ?? null, req.user!.id]
     );
 
     return res.status(201).json({ success: true, data: result.rows[0] });
