@@ -14,6 +14,7 @@ import type { DragEvent, FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { api, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
+import RealTaskModal from "@/components/tasks/real-task-modal";
 
 type Priority = "Critical" | "High" | "Medium" | "Low";
 
@@ -70,6 +71,7 @@ export default function BoardsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
 
   async function loadData() {
     try {
@@ -336,9 +338,10 @@ export default function BoardsPage() {
                         <article
                           key={task.id}
                           draggable={permissions.moveTask}
+                          onClick={() => setSelectedTaskId(task.id)}
                           onDragStart={(event) => handleDragStart(event, task.id)}
                           onDragEnd={() => setDraggedTaskId(null)}
-                          className="rounded-xl border bg-white p-4 shadow-sm"
+                          className="cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition hover:border-violet-300 hover:shadow-md"
                         >
                           <span
                             className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${priorityClass[task.priority]}`}
@@ -374,6 +377,13 @@ export default function BoardsPage() {
             </div>
           </div>
         )}
+
+        {selectedTaskId ? (
+          <RealTaskModal
+            taskId={selectedTaskId}
+            onClose={() => setSelectedTaskId(null)}
+          />
+        ) : null}
       </div>
     </div>
   );
