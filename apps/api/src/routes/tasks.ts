@@ -67,4 +67,101 @@ router.post("/", async (req, res) => {
   }
 });
 
+
+router.patch("/:id", async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      priority,
+      due_date,
+      stage_id,
+      board_id
+    } = req.body;
+
+    if (priority && !allowedPriorities.includes(priority)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid priority"
+      });
+    }
+
+    const result = await db.query(
+      `UPDATE tasks
+       SET title = COALESCE($1, title),
+           description = COALESCE($2, description),
+           priority = COALESCE($3, priority),
+           due_date = COALESCE($4, due_date),
+           stage_id = COALESCE($5, stage_id),
+           board_id = COALESCE($6, board_id),
+           updated_at = NOW()
+       WHERE id = $7
+       RETURNING *`,
+      [
+        title ?? null,
+        description ?? null,
+        priority ?? null,
+        due_date ?? null,
+        stage_id ?? null,
+        board_id ?? null,
+        req.params.id
+      ]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: result.rows[0]
+    });
+  } catch (error: any) {
+    if (error?.code === "23503") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid board or workflow stage"
+      });
+    }
+
+    console.error("Update task failed:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update task"
+    });
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  try {
+    const result = await db.query(
+      "DELETE FROM tasks WHERE id = $1 RETURNING id",
+      [req.params.id]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Task deleted"
+    });
+  } catch (error) {
+    console.error("Delete task failed:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to delete task"
+    });
+  }
+});
+
 export default router;
