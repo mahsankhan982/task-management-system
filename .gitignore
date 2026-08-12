@@ -1,0 +1,12 @@
+**/node_modules/
+**/.next/
+**/dist/
+**/coverage/
+**/.env
+**/.env.local
+**/.env.*.local
+**/*.tsbuildinfo
+**/*.bak
+**/*.corrupt-backup
+.DS_Store
+Thumbs.db
