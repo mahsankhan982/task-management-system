@@ -10,3 +10,6 @@
 **/*.corrupt-backup
 .DS_Store
 Thumbs.db
+
+apps/api/api-out.log
+apps/api/api-error.log
