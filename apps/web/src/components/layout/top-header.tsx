@@ -9,7 +9,6 @@ import {
   Search,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
-import RoleSwitcher from "@/components/layout/role-switcher";
 
 const getPageTitle = (pathname: string) => {
   if (pathname.startsWith("/dashboard/boards")) return "Boards";
@@ -60,9 +59,6 @@ export default function TopHeader() {
         <Plus size={17} />
         Create
       </button>
-
-      <RoleSwitcher />
-
       <div className="ml-auto flex items-center gap-1">
         <button
           type="button"
