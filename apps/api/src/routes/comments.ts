@@ -21,15 +21,15 @@ router.get("/task/:taskId", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const { task_id, user_id, body } = req.body;
+    const { task_id, body } = req.body;
 
-    if (!task_id || !user_id || !body || typeof body !== "string" || !body.trim()) {
+    if (!task_id || !body || typeof body !== "string" || !body.trim()) {
       return res.status(400).json({ success: false, message: "Task, user and comment are required" });
     }
 
     const result = await db.query(
       "INSERT INTO comments (task_id, user_id, body) VALUES ($1, $2, $3) RETURNING *",
-      [task_id, user_id, body.trim()]
+      [task_id, req.user!.id, body.trim()]
     );
 
     return res.status(201).json({ success: true, data: result.rows[0] });
