@@ -382,6 +382,7 @@ export default function BoardsPage() {
           <RealTaskModal
             taskId={selectedTaskId}
             onClose={() => setSelectedTaskId(null)}
+            onChanged={loadData}
           />
         ) : null}
       </div>
