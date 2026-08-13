@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Activity,
   CheckCircle2,
   MessageSquare,
   RefreshCw,
@@ -144,14 +143,11 @@ export default function ActivityPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  async function loadData(manual = false) {
+  async function loadData() {
     try {
-      if (manual) setRefreshing(true);
-      else setLoading(true);
-      setError("");
-
       const [activityResponse, taskResponse, boardResponse, teamResponse] =
         await Promise.all([api.activity(), api.tasks(), api.boards(), api.teams()]);
+      setError("");
 
       setEntries(
         ((activityResponse as { success: boolean; data: RawActivity[] }).data ?? []),
@@ -168,7 +164,7 @@ export default function ActivityPage() {
   }
 
   useEffect(() => {
-    loadData();
+    void Promise.resolve().then(() => loadData());
   }, []);
 
   const items = useMemo<ActivityItem[]>(() => {
@@ -234,7 +230,7 @@ export default function ActivityPage() {
 
           <button
             type="button"
-            onClick={() => loadData(true)}
+            onClick={() => { setRefreshing(true); void loadData(); }}
             disabled={refreshing}
             className="inline-flex items-center gap-2 self-start rounded-xl border border-violet-100 bg-white px-3 py-2 text-xs font-medium text-slate-600 shadow-sm disabled:opacity-60"
           >

@@ -20,14 +20,13 @@ export default function TeamsPage(){
 
   async function load(){
     try{
-      setError("");
       const [tr,ur]=await Promise.all([api.teams(),api.users()]) as [{data:Team[]},{data:User[]}];
-      const t=tr.data??[]; setTeams(t); setUsers(ur.data??[]);
+      const t=tr.data??[]; setError(""); setTeams(t); setUsers(ur.data??[]);
       setSelected(v=>v&&t.some(x=>String(x.id)===v)?v:(t[0]?String(t[0].id):""));
     }catch(e){ setError(e instanceof Error?e.message:"Unable to load teams"); }
     finally{ setLoading(false); }
   }
-  useEffect(()=>{load();},[]);
+  useEffect(()=>{void Promise.resolve().then(()=>load());},[]);
 
   const team=useMemo(()=>teams.find(t=>String(t.id)===selected),[teams,selected]);
   const members=useMemo(()=>users.filter(u=>team&&String(u.team_id)===String(team.id)),[users,team]);

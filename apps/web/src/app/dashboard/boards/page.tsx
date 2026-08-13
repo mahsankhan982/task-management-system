@@ -84,7 +84,6 @@ export default function BoardsPage() {
 
   async function loadData() {
     try {
-      setError("");
       const [boardsResponse, tasksResponse, workflowResponse, teamsResponse] = (await Promise.all([
         api.boards(),
         api.tasks(),
@@ -98,6 +97,7 @@ export default function BoardsPage() {
       ];
 
       const nextBoards = boardsResponse.data ?? [];
+      setError("");
       setBoards(nextBoards);
       setTeams(teamsResponse.data ?? []);
       setTasks(tasksResponse.data ?? []);
@@ -115,7 +115,7 @@ export default function BoardsPage() {
   }
 
   useEffect(() => {
-    loadData();
+    void Promise.resolve().then(() => loadData());
   }, []);
 
   const selectedBoard = boards.find((board) => board.id === selectedBoardId);

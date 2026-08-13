@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   CheckSquare,
@@ -114,12 +114,12 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
   const [busyChecklistId, setBusyChecklistId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  async function loadTask(syncForm = true) {
+  const loadTask = useCallback(async (syncForm = true) => {
     try {
-      setError("");
       const response = await apiRequest<{ success: boolean; data: TaskDetails }>(
         `/tasks/${taskId}`,
       );
+      setError("");
       setTask(response.data);
 
       if (syncForm) {
@@ -135,9 +135,9 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [taskId]);
 
-  async function loadOptions() {
+  const loadOptions = useCallback(async () => {
     try {
       const [workflowResponse, usersResponse] = await Promise.all([
         apiRequest<{ success: boolean; data: WorkflowStage[] }>("/workflow"),
@@ -151,13 +151,14 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load task options");
     }
-  }
+  }, []);
 
   useEffect(() => {
-    setLoading(true);
-    loadTask();
-    loadOptions();
-  }, [taskId]);
+    void Promise.resolve().then(() => {
+      void loadTask();
+      void loadOptions();
+    });
+  }, [loadTask, loadOptions]);
 
   const selectedAssignees = useMemo(
     () => users.filter((user) => assigneeIds.includes(String(user.id))),
