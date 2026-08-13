@@ -12,15 +12,19 @@ import workflowRouter from "./routes/workflow";
 import labelsRouter from "./routes/labels";
 import checklistRouter from "./routes/checklist";
 import activityRouter from "./routes/activity";
-import { preventTeamMemberWrites, requireAuth } from "./middleware/auth";
+import {
+  preventTeamMemberWrites,
+  requireAuth,
+  requireManagerWrites,
+} from "./middleware/auth";
 
 const app = express();
 
 app.disable("x-powered-by");
 
 app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 app.get("/api/health", (_req, res) => {
   res.status(200).json({
@@ -39,8 +43,8 @@ app.use("/api/auth", authRouter);
 app.use(requireAuth);
 app.use(preventTeamMemberWrites);
 
-app.use("/api/teams", teamsRouter);
-app.use("/api/users", usersRouter);
+app.use("/api/teams", requireManagerWrites, teamsRouter);
+app.use("/api/users", requireManagerWrites, usersRouter);
 app.use("/api/boards", boardsRouter);
 app.use("/api/tasks", tasksRouter);
 app.use("/api/comments", commentsRouter);
