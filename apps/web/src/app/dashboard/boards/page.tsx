@@ -6,8 +6,10 @@ import {
   CircleDot,
   Clock3,
   MessageSquare,
+  Pencil,
   Plus,
   Search,
+  Trash2,
   UserRound,
 } from "lucide-react";
 import type { DragEvent, FormEvent } from "react";
@@ -24,6 +26,11 @@ type Board = {
   description: string | null;
   team_id: number | null;
   team_name: string | null;
+};
+
+type Team = {
+  id: number;
+  name: string;
 };
 
 type WorkflowStage = {
@@ -60,8 +67,10 @@ const priorityClass: Record<Priority, string> = {
 };
 
 export default function BoardsPage() {
-  const { permissions } = useRole();
+  const { permissions, role } = useRole();
+  const canManageBoards = role !== "Team Member";
   const [boards, setBoards] = useState<Board[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [workflow, setWorkflow] = useState<WorkflowStage[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
@@ -76,18 +85,21 @@ export default function BoardsPage() {
   async function loadData() {
     try {
       setError("");
-      const [boardsResponse, tasksResponse, workflowResponse] = (await Promise.all([
+      const [boardsResponse, tasksResponse, workflowResponse, teamsResponse] = (await Promise.all([
         api.boards(),
         api.tasks(),
         api.workflow(),
+        api.teams(),
       ])) as [
         { success: boolean; data: Board[] },
         { success: boolean; data: Task[] },
         { success: boolean; data: WorkflowStage[] },
+        { success: boolean; data: Team[] },
       ];
 
       const nextBoards = boardsResponse.data ?? [];
       setBoards(nextBoards);
+      setTeams(teamsResponse.data ?? []);
       setTasks(tasksResponse.data ?? []);
       setWorkflow((workflowResponse.data ?? []).sort((a, b) => a.position - b.position));
 
@@ -190,6 +202,94 @@ export default function BoardsPage() {
     }
   }
 
+  function chooseTeam(currentTeamId?: number | null) {
+    if (teams.length === 0) {
+      window.alert("Create a team first from the Teams page.");
+      return undefined;
+    }
+
+    const choices = teams.map((team) => `${team.id}: ${team.name}`).join("\n");
+    const raw = window.prompt(
+      `Enter Team ID for this board:\n\n${choices}`,
+      currentTeamId ? String(currentTeamId) : String(teams[0].id),
+    );
+
+    if (raw === null) return undefined;
+    if (!raw.trim()) return null;
+
+    const teamId = Number(raw);
+    if (!Number.isFinite(teamId) || !teams.some((team) => Number(team.id) === teamId)) {
+      window.alert("Invalid Team ID.");
+      return undefined;
+    }
+
+    return teamId;
+  }
+
+  async function createBoard() {
+    if (!canManageBoards) return;
+
+    const name = window.prompt("Board name:")?.trim();
+    if (!name) return;
+
+    const description = window.prompt("Board description (optional):")?.trim() || null;
+    const team_id = chooseTeam();
+    if (team_id === undefined) return;
+
+    try {
+      setError("");
+      const result = (await apiRequest("/boards", {
+        method: "POST",
+        body: JSON.stringify({ name, description, team_id }),
+      })) as { data: Board };
+
+      await loadData();
+      if (result.data?.id) setSelectedBoardId(Number(result.data.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to create board");
+    }
+  }
+
+  async function editBoard(board: Board) {
+    if (!canManageBoards) return;
+
+    const name = window.prompt("Board name:", board.name)?.trim();
+    if (!name) return;
+
+    const description =
+      window.prompt("Board description:", board.description ?? "")?.trim() || null;
+    const team_id = chooseTeam(board.team_id);
+    if (team_id === undefined) return;
+
+    try {
+      setError("");
+      await apiRequest(`/boards/${board.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name, description, team_id }),
+      });
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to update board");
+    }
+  }
+
+  async function deleteBoard(board: Board) {
+    if (!canManageBoards) return;
+    if (!window.confirm(`Delete board "${board.name}"?`)) return;
+
+    try {
+      setError("");
+      await apiRequest(`/boards/${board.id}`, { method: "DELETE" });
+      await loadData();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to delete board. Delete or move its tasks first.",
+      );
+    }
+  }
+
   if (loading) {
     return <div className="p-8 text-sm text-slate-500">Loading board...</div>;
   }
@@ -211,6 +311,38 @@ export default function BoardsPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {canManageBoards ? (
+              <button
+                type="button"
+                onClick={createBoard}
+                className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700"
+              >
+                <Plus size={15} />
+                New Board
+              </button>
+            ) : null}
+
+            {selectedBoard && canManageBoards ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => editBoard(selectedBoard)}
+                  className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                >
+                  <Pencil size={14} />
+                  Edit Board
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteBoard(selectedBoard)}
+                  className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+                >
+                  <Trash2 size={14} />
+                  Delete Board
+                </button>
+              </>
+            ) : null}
+
             {boards.map((board) => (
               <button
                 key={board.id}
