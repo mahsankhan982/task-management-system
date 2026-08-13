@@ -13,3 +13,5 @@ Thumbs.db
 
 apps/api/api-out.log
 apps/api/api-error.log
+
+apps/api/api-start.log
