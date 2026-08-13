@@ -1,14 +1,9 @@
 "use client";
 
-import {
-  Bell,
-  CircleHelp,
-  Grid2X2,
-  Megaphone,
-  Plus,
-  Search,
-} from "lucide-react";
+import { Plus } from "lucide-react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRole } from "@/contexts/role-context";
 
 const getPageTitle = (pathname: string) => {
   if (pathname.startsWith("/dashboard/boards")) return "Boards";
@@ -17,76 +12,54 @@ const getPageTitle = (pathname: string) => {
   return "Dashboard";
 };
 
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "TM";
+}
+
 export default function TopHeader() {
   const pathname = usePathname();
+  const { user, permissions } = useRole();
   const pageTitle = getPageTitle(pathname);
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center gap-3 border-b border-white/10 bg-[#51417f] px-4 text-white shadow-sm md:px-5">
-      <button
-        type="button"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white/80 transition hover:bg-white/10 hover:text-white"
-        aria-label="Apps"
-      >
-        <Grid2X2 size={18} />
-      </button>
-
-      <div className="hidden min-w-[150px] items-center gap-2 lg:flex">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-xs font-black text-[#51417f]">
+      <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-black text-[#51417f]">
           TM
         </div>
-        <div className="leading-tight">
-          <p className="text-sm font-semibold">Task Manager</p>
+        <div className="min-w-0 leading-tight">
+          <p className="truncate text-sm font-semibold">Task Manager</p>
           <p className="text-[10px] text-violet-200">{pageTitle}</p>
         </div>
+      </Link>
+
+      <div className="flex-1" />
+
+      {permissions.createTask ? (
+        <Link
+          href="/dashboard/boards"
+          className="hidden h-9 items-center gap-2 rounded-lg bg-[#0c66e4] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0055cc] sm:flex"
+        >
+          <Plus size={17} />
+          Create Task
+        </Link>
+      ) : null}
+
+      <div className="hidden text-right sm:block">
+        <p className="max-w-[180px] truncate text-xs font-semibold">{user.full_name}</p>
+        <p className="text-[10px] text-violet-200">{user.role}</p>
       </div>
 
-      <div className="flex min-w-0 flex-1 items-center">
-        <div className="flex h-9 w-full max-w-[760px] items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 transition focus-within:bg-white/15">
-          <Search size={16} className="shrink-0 text-violet-100" />
-          <input
-            type="text"
-            placeholder="Search tasks, boards, people..."
-            className="w-full bg-transparent text-sm text-white outline-none placeholder:text-violet-200"
-          />
-        </div>
-      </div>
-
-      <button
-        type="button"
-        className="hidden h-9 items-center gap-2 rounded-lg bg-[#0c66e4] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0055cc] sm:flex"
+      <div
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0c66e4] text-[11px] font-bold text-white ring-2 ring-white/20"
+        title={`${user.full_name} · ${user.role}`}
       >
-        <Plus size={17} />
-        Create
-      </button>
-      <div className="ml-auto flex items-center gap-1">
-        <button
-          type="button"
-          className="hidden h-9 w-9 items-center justify-center rounded-lg text-white/85 transition hover:bg-white/10 sm:flex"
-          aria-label="Announcements"
-        >
-          <Megaphone size={17} />
-        </button>
-
-        <button
-          type="button"
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-white/85 transition hover:bg-white/10"
-          aria-label="Notifications"
-        >
-          <Bell size={17} />
-        </button>
-
-        <button
-          type="button"
-          className="hidden h-9 w-9 items-center justify-center rounded-lg text-white/85 transition hover:bg-white/10 md:flex"
-          aria-label="Help"
-        >
-          <CircleHelp size={17} />
-        </button>
-
-        <div className="ml-1 flex h-9 w-9 items-center justify-center rounded-full bg-[#0c66e4] text-[11px] font-bold text-white ring-2 ring-white/20">
-          MK
-        </div>
+        {initials(user.full_name)}
       </div>
     </header>
   );
