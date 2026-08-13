@@ -81,7 +81,7 @@ export default function TeamsPage() {
         </div>
       ) : (
         <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
-          <div className="rounded-2xl border bg-white p-3 shadow-sm">
+          <div className="rounded-2x border bg-white p-3 shadow-sm">
             {teams.map((team) => {
               const count = users.filter((user) => String(user.team_id) === String(team.id)).length;
               const active = String(team.id) === selectedId;
@@ -102,7 +102,7 @@ export default function TeamsPage() {
           </div>
 
           <div className="overflow-hidden rounded-2xl border bg-white shadow-sm">
-            <div className="border-b p-6">
+            <div className="border-b p6">
               <h2 className="text-xl font-semibold">{selectedTeam?.name}</h2>
               <p className="mt-1 text-sm text-slate-500">
                 {selectedTeam?.description || "No description added."}
