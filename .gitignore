@@ -15,3 +15,5 @@ apps/api/api-out.log
 apps/api/api-error.log
 
 apps/api/api-start.log
+apps/web/web-dev-error.log
+apps/web/web-dev-out.log
