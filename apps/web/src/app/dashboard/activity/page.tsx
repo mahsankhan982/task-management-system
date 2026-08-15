@@ -213,17 +213,17 @@ export default function ActivityPage() {
   }, [filter, items, query]);
 
   return (
-    <div className="min-h-full bg-gradient-to-br from-violet-50/80 via-white to-slate-50 p-5 md:p-8">
+    <div className="min-h-full bg-gradient-to-br from-[#64499a] via-[#a85dbd] to-[#d46bb6] p-5 md:p-8">
       <div className="mx-auto w-full max-w-[1450px]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-500">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-100">
               Workspace activity
             </p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#24193f]">
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-white">
               Activity
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/80">
               Live task, assignment and workflow activity from PostgreSQL.
             </p>
           </div>

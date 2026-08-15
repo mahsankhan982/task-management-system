@@ -60,13 +60,13 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1500px] p-5 md:p-8">
+    <div className="min-h-full w-full bg-gradient-to-br from-[#64499a] via-[#a85dbd] to-[#d46bb6] p-5 md:p-8">
       <section className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">
+        <p className="text-xs font-semibold uppercase tracking-wider text-violet-100">
           Live Workspace
         </p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-950">Dashboard</h1>
-        <p className="mt-2 text-sm text-slate-500">
+        <h1 className="mt-2 text-3xl font-semibold text-white">Dashboard</h1>
+        <p className="mt-2 text-sm text-white/80">
           Real task, team and activity data from PostgreSQL.
         </p>
       </section>

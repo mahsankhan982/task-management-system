@@ -295,17 +295,17 @@ export default function BoardsPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-5rem)] bg-[#f3f5f9] p-4 md:p-6">
-      <div className="mx-auto max-w-[1800px]">
-        <div className="mb-4 flex flex-col gap-3 rounded-2xl border bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#64499a] via-[#a85dbd] to-[#d46bb6] p-3 md:p-4">
+      <div className="mx-auto max-w-none">
+        <div className="mb-3 flex flex-col gap-3 rounded-xl border border-white/10 bg-[#5b3f88]/95 p-3 text-white shadow-lg backdrop-blur lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-200">
               Live Workspace
             </p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">
+            <h1 className="mt-1 text-xl font-bold text-white">
               {selectedBoard?.name ?? "Boards"}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-xs text-white/70">
               {selectedBoard?.team_name ?? "No team"} · PostgreSQL data
             </p>
           </div>
@@ -315,7 +315,7 @@ export default function BoardsPage() {
               <button
                 type="button"
                 onClick={createBoard}
-                className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700"
+                className="flex items-center gap-2 rounded-md bg-white/15 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/25"
               >
                 <Plus size={15} />
                 New Board
@@ -327,7 +327,7 @@ export default function BoardsPage() {
                 <button
                   type="button"
                   onClick={() => editBoard(selectedBoard)}
-                  className="flex items-center gap-2 rounded-lg border bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                  className="flex items-center gap-2 rounded-md bg-white/15 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/25"
                 >
                   <Pencil size={14} />
                   Edit Board
@@ -348,10 +348,10 @@ export default function BoardsPage() {
                 key={board.id}
                 type="button"
                 onClick={() => setSelectedBoardId(board.id)}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold ${
+                className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
                   board.id === selectedBoardId
-                    ? "bg-violet-700 text-white"
-                    : "border bg-white text-slate-700"
+                    ? "bg-white text-[#5b3f88] shadow-sm"
+                    : "bg-white/15 text-white hover:bg-white/25"
                 }`}
               >
                 {board.name}
@@ -419,7 +419,7 @@ export default function BoardsPage() {
           </form>
         ) : null}
 
-        <div className="mb-4 flex items-center rounded-xl border bg-white px-3 shadow-sm">
+        <div className="mb-3 flex items-center rounded-lg border border-white/30 bg-white/95 px-3 shadow-sm">
           <Search size={16} className="text-slate-400" />
           <input
             value={query}
@@ -434,7 +434,7 @@ export default function BoardsPage() {
             No boards found in the database.
           </div>
         ) : (
-          <div className="overflow-x-auto pb-3">
+          <div className="min-h-[calc(100vh-13rem)] overflow-x-auto rounded-xl bg-black/10 p-2 pb-4">
             <div className="flex min-w-max items-start gap-3">
               {workflow.map((stage) => {
                 const Icon = stageIcons[stage.name as keyof typeof stageIcons] ?? CircleDot;
@@ -455,9 +455,9 @@ export default function BoardsPage() {
                       if (taskId) moveTask(taskId, stage.id);
                       setDraggedTaskId(null);
                     }}
-                    className="w-[300px] shrink-0 rounded-xl bg-[#e9edf3] p-3"
+                    className="w-[285px] shrink-0 rounded-xl bg-[#f1f2f4] p-2.5 shadow-sm"
                   >
-                    <div className="mb-3 flex items-center gap-2 px-1">
+                    <div className="mb-2.5 flex items-center gap-2 px-1">
                       <Icon size={16} className="text-slate-600" />
                       <h2 className="text-sm font-semibold text-slate-800">{stage.name}</h2>
                       <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">
@@ -473,7 +473,7 @@ export default function BoardsPage() {
                           onClick={() => setSelectedTaskId(task.id)}
                           onDragStart={(event) => handleDragStart(event, task.id)}
                           onDragEnd={() => setDraggedTaskId(null)}
-                          className="cursor-pointer rounded-xl border bg-white p-4 shadow-sm transition hover:border-violet-300 hover:shadow-md"
+                          className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md"
                         >
                           <span
                             className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${priorityClass[task.priority]}`}
@@ -481,7 +481,7 @@ export default function BoardsPage() {
                             {task.priority}
                           </span>
 
-                          <h3 className="mt-3 text-sm font-semibold leading-5 text-slate-900">
+                          <h3 className="mt-2.5 text-sm font-semibold leading-5 text-slate-900">
                             {task.title}
                           </h3>
 

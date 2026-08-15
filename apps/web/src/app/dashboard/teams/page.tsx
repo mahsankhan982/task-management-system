@@ -82,12 +82,12 @@ export default function TeamsPage(){
 
   if(loading)return <div className="p-8 text-sm text-slate-500">Loading teams...</div>;
 
-  return <div className="mx-auto w-full max-w-[1500px] p-5 md:p-8">
+  return <div className="min-h-full w-full bg-gradient-to-br from-[#64499a] via-[#a85dbd] to-[#d46bb6] p-5 md:p-8">
     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">Team Management</p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-950">Teams & Users</h1>
-        <p className="mt-2 text-sm text-slate-600">Live workspace management from PostgreSQL.</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-violet-100">Team Management</p>
+        <h1 className="mt-2 text-3xl font-semibold text-white">Teams & Users</h1>
+        <p className="mt-2 text-sm text-white/80">Live workspace management from PostgreSQL.</p>
       </div>
       {canManage?<div className="flex gap-2">
         <button onClick={addTeam} className="flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-semibold"><Plus size={16}/>Add Team</button>

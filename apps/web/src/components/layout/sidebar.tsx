@@ -34,10 +34,10 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="hidden h-[calc(100vh-4rem)] w-[250px] shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
-      <div className="flex h-20 items-center border-b border-slate-100 px-6">
+    <aside className="hidden h-[calc(100vh-4rem)] w-[260px] shrink-0 border-r border-slate-200 bg-[#fafbfc] lg:flex lg:flex-col">
+      <div className="flex h-[72px] items-center border-b border-slate-200 bg-white px-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#101828] text-sm font-bold text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0c66e4] text-sm font-bold text-white shadow-sm">
             TM
           </div>
           <div>
@@ -47,8 +47,8 @@ export default function Sidebar() {
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col px-4 py-6">
-        <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+      <div className="flex flex-1 flex-col px-3 py-5">
+        <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
           Workspace
         </p>
 
@@ -62,9 +62,9 @@ export default function Sidebar() {
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition ${
+                className={`flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition ${
                   active
-                    ? "bg-[#101828] text-white"
+                    ? "bg-[#e9f2ff] font-semibold text-[#0c66e4]"
                     : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
                 }`}
               >
@@ -88,8 +88,8 @@ export default function Sidebar() {
       </div>
 
       <div className="border-t border-slate-100 p-4">
-        <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#101828] text-xs font-semibold text-white">
+        <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0c66e4] text-xs font-semibold text-white">
             {initials(user.full_name)}
           </div>
           <div className="min-w-0">
