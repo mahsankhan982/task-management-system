@@ -298,7 +298,6 @@ export default function BoardsPage() {
   return (
     <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#64499a] via-[#a85dbd] to-[#d46bb6] p-3 md:p-4">
       <BoardNavPanels boards={boards} selectedBoardId={selectedBoardId} onSelectBoard={(id) => setSelectedBoardId(id)} />
-      <BoardNavPanels boards={boards} selectedBoardId={selectedBoardId} onSelectBoard={(id) => setSelectedBoardId(id)} />
       <div className="mx-auto max-w-none">
         <div className="mb-3 flex flex-col gap-3 rounded-xl border border-white/10 bg-[#5b3f88]/95 p-3 text-white shadow-lg backdrop-blur lg:flex-row lg:items-center lg:justify-between">
           <div>
