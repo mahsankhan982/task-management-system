@@ -1,0 +1,11 @@
+ALTER TABLE workflow_stages ADD COLUMN IF NOT EXISTS board_id BIGINT REFERENCES boards(id) ON DELETE CASCADE;
+ALTER TABLE workflow_stages DROP CONSTRAINT IF EXISTS workflow_stages_name_key;
+ALTER TABLE workflow_stages DROP CONSTRAINT IF EXISTS workflow_stages_position_key;
+CREATE TEMP TABLE old_stage_map AS SELECT id,name,position FROM workflow_stages WHERE board_id IS NULL;
+INSERT INTO workflow_stages (name,position,board_id) SELECT s.name,s.position,b.id FROM old_stage_map s CROSS JOIN boards b;
+UPDATE tasks t SET stage_id=n.id FROM old_stage_map o, workflow_stages n WHERE t.stage_id=o.id AND n.board_id=t.board_id AND n.name=o.name;
+DELETE FROM workflow_stages WHERE board_id IS NULL;
+ALTER TABLE workflow_stages ALTER COLUMN board_id SET NOT NULL;
+ALTER TABLE workflow_stages ADD CONSTRAINT workflow_stages_board_name_unique UNIQUE (board_id,name);
+ALTER TABLE workflow_stages ADD CONSTRAINT workflow_stages_board_position_unique UNIQUE (board_id,position);
+CREATE INDEX IF NOT EXISTS idx_workflow_stages_board_id ON workflow_stages(board_id);
