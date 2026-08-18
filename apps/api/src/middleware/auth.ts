@@ -77,6 +77,10 @@ export function preventTeamMemberWrites(req: Request, res: Response, next: NextF
     return next();
   }
 
+  if (req.path.startsWith("/api/notifications")) {
+    return next();
+  }
+
   if (req.user?.role === "Team Member") {
     return res.status(403).json({
       success: false,

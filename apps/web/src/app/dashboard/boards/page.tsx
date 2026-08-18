@@ -540,7 +540,7 @@ export default function BoardsPage() {
                       </span>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="max-h-[285px] space-y-3 overflow-y-auto pr-1">
                       {stageTasks.map((task) => (
                         <article
                           key={task.id}

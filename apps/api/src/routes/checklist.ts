@@ -61,4 +61,32 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
+router.delete("/:id", async (req, res) => {
+  try {
+    const result = await db.query(
+      "DELETE FROM checklist_items WHERE id = $1 RETURNING id, task_id, title",
+      [req.params.id]
+    );
+
+    if (!result.rows[0]) {
+      return res.status(404).json({
+        success: false,
+        message: "Checklist item not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Checklist item deleted",
+      data: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Delete checklist failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to delete checklist item",
+    });
+  }
+});
+
 export default router;
