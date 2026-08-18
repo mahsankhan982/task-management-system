@@ -86,19 +86,19 @@ export default function TeamsPage(){
     <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <p className="text-xs font-semibold uppercase tracking-wider text-violet-100">Team Management</p>
-        <h1 className="mt-2 text-3xl font-semibold text-white">Teams & Users</h1>
+        <h1 className="mt-2 text-3xl font-semibold text-white">Teams & Members</h1>
         <p className="mt-2 text-sm text-white/80">Live workspace management from PostgreSQL.</p>
       </div>
       {canManage?<div className="flex gap-2">
         <button onClick={addTeam} className="flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-semibold"><Plus size={16}/>Add Team</button>
-        <button onClick={addUser} className="flex h-10 items-center gap-2 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white"><UserPlus size={16}/>Add User</button>
+        <button onClick={addUser} className="flex h-10 items-center gap-2 rounded-xl bg-violet-700 px-4 text-sm font-semibold text-white"><UserPlus size={16}/>Add Member</button>
       </div>:null}
     </div>
 
     {error?<div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>:null}
 
     <div className="mb-6 grid gap-4 sm:grid-cols-3">
-      <Stat n={teams.length} label="Teams"/><Stat n={users.length} label="Users"/><Stat n={users.filter(u=>u.is_active).length} label="Active users"/>
+      <Stat n={teams.length} label="Teams"/><Stat n={users.length} label="Members"/><Stat n={users.filter(u=>u.is_active).length} label="Active members"/>
     </div>
 
     <div className="grid gap-6 xl:grid-cols-[320px_1fr]">
@@ -119,7 +119,7 @@ export default function TeamsPage(){
         </div>
 
         <div className="divide-y">
-          {members.length===0?<div className="p-8 text-sm text-slate-500">No users assigned to this team.</div>:null}
+          {members.length===0?<div className="p-8 text-sm text-slate-500">No members assigned to this team.</div>:null}
           {members.map(u=><div key={String(u.id)} className="flex items-center justify-between gap-4 p-5">
             <div><p className="font-semibold text-slate-900">{u.full_name}</p><p className="mt-1 text-sm text-slate-500">{u.email}</p></div>
             <div className="flex items-center gap-3">

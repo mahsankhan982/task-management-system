@@ -38,6 +38,7 @@ type WorkflowStage = {
   id: number;
   name: string;
   position: number;
+  board_id?: number;
 };
 
 type Task = {
@@ -56,6 +57,7 @@ const stageIcons = {
   "To Do": CircleDot,
   "In Progress": Clock3,
   "Waiting for Lead": UserRound,
+  "Waiting for Review": MessageSquare,
   Review: MessageSquare,
   Completed: CheckCircle2,
 } as const;
@@ -121,6 +123,77 @@ export default function BoardsPage() {
 
   const selectedBoard = boards.find((board) => board.id === selectedBoardId);
 
+  const boardWorkflow = useMemo(
+    () =>
+      workflow
+        .filter(
+          (stage) =>
+            stage.board_id === undefined ||
+            Number(stage.board_id) === Number(selectedBoardId),
+        )
+        .sort((a, b) => a.position - b.position),
+    [workflow, selectedBoardId],
+  );
+
+  const displayWorkflow = useMemo(() => {
+    const byName = (name: string) =>
+      boardWorkflow.find((stage) => stage.name === name);
+
+    const toDo = byName("To Do");
+    const inProgress = byName("In Progress");
+    const waiting = byName("Waiting for Lead");
+    const review = byName("Review");
+    const completed = byName("Completed");
+
+    const coreIds = new Set(
+      [toDo, inProgress, waiting, review, completed]
+        .filter(Boolean)
+        .map((stage) => Number(stage!.id)),
+    );
+
+    const extraIds = boardWorkflow
+      .filter((stage) => !coreIds.has(Number(stage.id)))
+      .map((stage) => Number(stage.id));
+
+    return [
+      toDo
+        ? {
+            id: Number(toDo.id),
+            name: "To Do",
+            stageIds: [Number(toDo.id), ...extraIds],
+          }
+        : null,
+      inProgress
+        ? {
+            id: Number(inProgress.id),
+            name: "In Progress",
+            stageIds: [Number(inProgress.id)],
+          }
+        : null,
+      waiting || review
+        ? {
+            id: Number((waiting ?? review)!.id),
+            name: "Waiting for Review",
+            stageIds: [waiting?.id, review?.id]
+              .filter((id): id is number => typeof id === "number")
+              .map(Number),
+          }
+        : null,
+      completed
+        ? {
+            id: Number(completed.id),
+            name: "Completed",
+            stageIds: [Number(completed.id)],
+          }
+        : null,
+    ].filter(Boolean) as Array<{
+      id: number;
+      name: string;
+      stageIds: number[];
+    }>;
+  }, [boardWorkflow]);
+
+
   const boardTasks = useMemo(() => {
     const clean = query.trim().toLowerCase();
     return tasks.filter((task) => {
@@ -144,7 +217,7 @@ export default function BoardsPage() {
           ? {
               ...task,
               stage_id: stageId,
-              stage_name: workflow.find((stage) => stage.id === stageId)?.name ?? task.stage_name,
+              stage_name: boardWorkflow.find((stage) => stage.id === stageId)?.name ?? task.stage_name,
             }
           : task,
       ),
@@ -402,10 +475,10 @@ export default function BoardsPage() {
             </select>
             <select
               name="stage_id"
-              defaultValue={String(workflow[0]?.id ?? "")}
+              defaultValue={String(displayWorkflow[0]?.id ?? "")}
               className="h-11 rounded-xl border px-3 text-sm"
             >
-              {workflow.map((stage) => (
+              {displayWorkflow.map((stage) => (
                 <option key={stage.id} value={stage.id}>
                   {stage.name}
                 </option>
@@ -438,9 +511,9 @@ export default function BoardsPage() {
         ) : (
           <div className="min-h-[calc(100vh-13rem)] overflow-x-auto rounded-xl bg-black/10 p-2 pb-4">
             <div className="flex min-w-max items-start gap-3">
-              {workflow.map((stage) => {
+              {displayWorkflow.map((stage) => {
                 const Icon = stageIcons[stage.name as keyof typeof stageIcons] ?? CircleDot;
-                const stageTasks = boardTasks.filter((task) => task.stage_id === stage.id);
+                const stageTasks = boardTasks.filter((task) => stage.stageIds.includes(Number(task.stage_id)));
 
                 return (
                   <section

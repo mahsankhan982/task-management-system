@@ -80,6 +80,7 @@ type Props = {
 };
 
 const priorities: Priority[] = ["Critical", "High", "Medium", "Low"];
+const modalCoreStageNames = ["To Do", "In Progress", "Waiting for Lead", "Review", "Completed"] as const;
 
 function formatDate(value: string | null) {
   if (!value) return "Not set";
@@ -109,6 +110,7 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
   const [newChecklist, setNewChecklist] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [posting, setPosting] = useState(false);
   const [addingChecklist, setAddingChecklist] = useState(false);
   const [busyChecklistId, setBusyChecklistId] = useState<string | null>(null);
@@ -137,15 +139,19 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
     }
   }, [taskId]);
 
-  const loadOptions = useCallback(async () => {
+  const loadOptions = useCallback(async (boardId: Id) => {
     try {
       const [workflowResponse, usersResponse] = await Promise.all([
-        apiRequest<{ success: boolean; data: WorkflowStage[] }>("/workflow"),
+        apiRequest<{ success: boolean; data: WorkflowStage[] }>(`/workflow?board_id=${boardId}`),
         apiRequest<{ success: boolean; data: UserOption[] }>("/users"),
       ]);
 
       setWorkflow(
-        (workflowResponse.data ?? []).sort((a, b) => Number(a.position) - Number(b.position)),
+        (workflowResponse.data ?? [])
+          .filter((stage) =>
+            modalCoreStageNames.includes(stage.name as (typeof modalCoreStageNames)[number]),
+          )
+          .sort((a, b) => Number(a.position) - Number(b.position)),
       );
       setUsers((usersResponse.data ?? []).filter((user) => user.is_active !== false));
     } catch (err) {
@@ -156,9 +162,14 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
   useEffect(() => {
     void Promise.resolve().then(() => {
       void loadTask();
-      void loadOptions();
     });
-  }, [loadTask, loadOptions]);
+  }, [loadTask]);
+
+  useEffect(() => {
+    if (!task?.board_id) return;
+
+    void Promise.resolve().then(() => loadOptions(task.board_id));
+  }, [task?.board_id, loadOptions]);
 
   const selectedAssignees = useMemo(
     () => users.filter((user) => assigneeIds.includes(String(user.id))),
@@ -172,6 +183,7 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
 
     try {
       setSaving(true);
+      setSaved(false);
       setError("");
 
       if (permissions.editTask) {
@@ -198,6 +210,8 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
 
       await loadTask();
       await onChanged?.();
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save task");
     } finally {
@@ -309,10 +323,10 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
                 type="button"
                 onClick={saveTask}
                 disabled={saving}
-                className="flex h-9 items-center gap-2 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white disabled:opacity-60"
+                className={`flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white transition disabled:opacity-60 ${saved ? "bg-emerald-600" : "bg-violet-700"}`}
               >
                 {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-                {saving ? "Saving..." : "Save"}
+                {saving ? "Saving..." : saved ? "Saved" : "Save"}
               </button>
             ) : null}
 
