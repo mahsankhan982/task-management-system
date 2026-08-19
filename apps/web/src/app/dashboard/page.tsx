@@ -1,114 +1,324 @@
 "use client";
 
 import Link from "next/link";
-import { Activity, CheckCircle2, CircleDot, Clock3, ListTodo, Users } from "lucide-react";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import {
+  Code2,
+  Megaphone,
+  Palette,
+  UserPlus,
+  X,
+} from "lucide-react";
+import {
+  useEffect,
+  useState,
+  type FormEvent,
+} from "react";
 
-type Task = {
-  id: number | string;
-  stage_name: string;
-};
+import { api, apiRequest } from "@/lib/api";
+import { useRole } from "@/contexts/role-context";
 
 type Team = {
   id: number | string;
+  name: string;
 };
 
-type ApiList<T> = {
-  data: T[];
-};
+type Role = "Coordinator" | "Team Lead" | "Team Member";
+
+const workspaces = [
+  {
+    title: "Creative",
+    description: "Open the Creative workspace.",
+    href: "/dashboard/creative",
+    icon: Palette,
+  },
+  {
+    title: "Website",
+    description: "Open the Website workspace.",
+    href: "/dashboard/website",
+    icon: Code2,
+  },
+  {
+    title: "Digital",
+    description: "Open the Digital workspace.",
+    href: "/dashboard/digital",
+    icon: Megaphone,
+  },
+];
 
 export default function DashboardPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const { role } = useRole();
+  const canJoinEmployee = role === "Manager";
+
   const [teams, setTeams] = useState<Team[]>([]);
-  const [activityCount, setActivityCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [showJoin, setShowJoin] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState("");
+  const [joinSuccess, setJoinSuccess] = useState("");
 
   useEffect(() => {
-    Promise.all([api.tasks(), api.teams(), api.activity()])
-      .then(([taskResult, teamResult, activityResult]) => {
-        setTasks((taskResult as ApiList<Task>).data ?? []);
-        setTeams((teamResult as ApiList<Team>).data ?? []);
-        setActivityCount((activityResult as ApiList<unknown>).data?.length ?? 0);
-      })
-      .catch((err) => setError(err instanceof Error ? err.message : "Unable to load dashboard"))
-      .finally(() => setLoading(false));
-  }, []);
+    if (!canJoinEmployee) return;
 
-  const stats = [
-    { label: "Total Tasks", value: tasks.length, icon: ListTodo },
-    {
-      label: "In Progress",
-      value: tasks.filter((task) => task.stage_name === "In Progress").length,
-      icon: CircleDot,
-    },
-    {
-      label: "Waiting for Lead",
-      value: tasks.filter((task) => task.stage_name === "Waiting for Lead").length,
-      icon: Clock3,
-    },
-    {
-      label: "Completed",
-      value: tasks.filter((task) => task.stage_name === "Completed").length,
-      icon: CheckCircle2,
-    },
-  ];
+    void Promise.resolve().then(async () => {
+      try {
+        const response = (await api.teams()) as {
+          success: boolean;
+          data: Team[];
+        };
+        setTeams(response.data ?? []);
+      } catch {
+        setTeams([]);
+      }
+    });
+  }, [canJoinEmployee]);
 
-  if (loading) {
-    return <div className="p-8 text-sm text-slate-500">Loading dashboard...</div>;
+  async function joinEmployee(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    if (!canJoinEmployee || joining) return;
+
+    const form = new FormData(event.currentTarget);
+
+    const full_name = String(form.get("full_name") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim();
+    const password = String(form.get("password") ?? "");
+    const employeeRole = String(form.get("role") ?? "Team Member") as Role;
+    const teamValue = String(form.get("team_id") ?? "").trim();
+    const team_id = teamValue ? Number(teamValue) : null;
+
+    if (!full_name || !email || !password) {
+      setJoinError("Name, email and temporary password are required.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setJoinError("Temporary password must be at least 8 characters.");
+      return;
+    }
+
+    try {
+      setJoining(true);
+      setJoinError("");
+      setJoinSuccess("");
+
+      await apiRequest("/users", {
+        method: "POST",
+        body: JSON.stringify({
+          full_name,
+          email,
+          password,
+          role: employeeRole,
+          team_id,
+        }),
+      });
+
+      setJoinSuccess(`${full_name} joined successfully.`);
+      formElement.reset();
+
+      window.setTimeout(() => {
+        setShowJoin(false);
+        setJoinSuccess("");
+      }, 1500);
+    } catch (err) {
+      setJoinError(
+        err instanceof Error ? err.message : "Unable to join employee.",
+      );
+    } finally {
+      setJoining(false);
+    }
   }
 
   return (
     <div className="min-h-full w-full bg-gradient-to-br from-[#64499a] via-[#a85dbd] to-[#d46bb6] p-5 md:p-8">
-      <section className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-wider text-violet-100">
-          Live Workspace
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold text-white">Dashboard</h1>
-        <p className="mt-2 text-sm text-white/80">
-          Real task, team and activity data from PostgreSQL.
-        </p>
+      <section className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-violet-100">
+            Live Workspace
+          </p>
+
+          <h1 className="mt-2 text-3xl font-semibold text-white">
+            Dashboard
+          </h1>
+
+          <p className="mt-2 text-sm text-white/80">
+            Select the workspace you want to manage.
+          </p>
+        </div>
+
+        {canJoinEmployee ? (
+          <button
+            type="button"
+            onClick={() => {
+              setJoinError("");
+              setJoinSuccess("");
+              setShowJoin(true);
+            }}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-violet-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+          >
+            <UserPlus size={18} />
+            Join Employee
+          </button>
+        ) : null}
       </section>
 
-      {error ? (
-        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      ) : null}
+      <section className="grid gap-5 md:grid-cols-3">
+        {workspaces.map((workspace) => {
+          const Icon = workspace.icon;
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
           return (
-            <article key={stat.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <Icon size={19} className="text-violet-700" />
-              <p className="mt-5 text-3xl font-semibold text-slate-950">{stat.value}</p>
-              <p className="mt-1 text-sm font-medium text-slate-600">{stat.label}</p>
-            </article>
+            <Link
+              key={workspace.title}
+              href={workspace.href}
+              className="group min-h-[170px] rounded-2xl border border-white/40 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-xl"
+            >
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-700 transition group-hover:bg-violet-700 group-hover:text-white">
+                <Icon size={21} />
+              </div>
+
+              <h2 className="mt-7 text-xl font-semibold text-slate-950">
+                {workspace.title}
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                {workspace.description}
+              </p>
+            </Link>
           );
         })}
       </section>
 
-      <section className="mt-7 grid gap-4 md:grid-cols-3">
-        <Link href="/dashboard/boards" className="rounded-2xl border bg-white p-5 shadow-sm hover:border-violet-300">
-          <ListTodo size={19} className="text-violet-700" />
-          <p className="mt-4 font-semibold text-slate-950">Boards</p>
-          <p className="mt-1 text-sm text-slate-500">Open tasks and workflow.</p>
-        </Link>
+      {showJoin && canJoinEmployee ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <button
+            type="button"
+            aria-label="Close join employee"
+            onClick={() => setShowJoin(false)}
+            className="absolute inset-0"
+          />
 
-        <Link href="/dashboard/teams" className="rounded-2xl border bg-white p-5 shadow-sm hover:border-violet-300">
-          <Users size={19} className="text-violet-700" />
-          <p className="mt-4 text-2xl font-semibold text-slate-950">{teams.length}</p>
-          <p className="mt-1 text-sm text-slate-500">Teams in workspace</p>
-        </Link>
+          <div className="relative z-10 w-full max-w-xl rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">
+                  Employee Joining
+                </p>
 
-        <Link href="/dashboard/activity" className="rounded-2xl border bg-white p-5 shadow-sm hover:border-violet-300">
-          <Activity size={19} className="text-violet-700" />
-          <p className="mt-4 text-2xl font-semibold text-slate-950">{activityCount}</p>
-          <p className="mt-1 text-sm text-slate-500">Recorded activities</p>
-        </Link>
-      </section>
+                <h2 className="mt-1 text-xl font-semibold text-slate-950">
+                  Join Employee
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Create the employee login account using name and email.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowJoin(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+              >
+                <X size={19} />
+              </button>
+            </div>
+
+            <form onSubmit={joinEmployee} className="p-6">
+              {joinError ? (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {joinError}
+                </div>
+              ) : null}
+
+              {joinSuccess ? (
+                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
+                  {joinSuccess}
+                </div>
+              ) : null}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-sm font-semibold text-slate-700">
+                  Full Name
+                  <input
+                    name="full_name"
+                    required
+                    placeholder="Employee name"
+                    className="mt-2 h-11 w-full rounded-xl border px-3 text-sm font-normal outline-none focus:border-violet-500"
+                  />
+                </label>
+
+                <label className="text-sm font-semibold text-slate-700">
+                  Email
+                  <input
+                    name="email"
+                    type="email"
+                    required
+                    placeholder="employee@company.com"
+                    className="mt-2 h-11 w-full rounded-xl border px-3 text-sm font-normal outline-none focus:border-violet-500"
+                  />
+                </label>
+
+                <label className="text-sm font-semibold text-slate-700">
+                  Temporary Password
+                  <input
+                    name="password"
+                    type="password"
+                    required
+                    minLength={8}
+                    placeholder="Minimum 8 characters"
+                    className="mt-2 h-11 w-full rounded-xl border px-3 text-sm font-normal outline-none focus:border-violet-500"
+                  />
+                </label>
+
+                <label className="text-sm font-semibold text-slate-700">
+                  Role
+                  <select
+                    name="role"
+                    defaultValue="Team Member"
+                    className="mt-2 h-11 w-full rounded-xl border bg-white px-3 text-sm font-normal outline-none focus:border-violet-500"
+                  >
+                    <option value="Team Member">Team Member</option>
+                    <option value="Team Lead">Team Lead</option>
+                    <option value="Coordinator">Coordinator</option>
+                  </select>
+                </label>
+
+                <label className="text-sm font-semibold text-slate-700 sm:col-span-2">
+                  Team
+                  <select
+                    name="team_id"
+                    defaultValue=""
+                    className="mt-2 h-11 w-full rounded-xl border bg-white px-3 text-sm font-normal outline-none focus:border-violet-500"
+                  >
+                    <option value="">No team</option>
+                    {teams.map((team) => (
+                      <option key={String(team.id)} value={String(team.id)}>
+                        {team.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowJoin(false)}
+                  className="h-10 rounded-xl border px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={joining}
+                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-violet-700 px-5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  <UserPlus size={16} />
+                  {joining ? "Joining..." : "Join Employee"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

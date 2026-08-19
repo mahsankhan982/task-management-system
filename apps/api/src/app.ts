@@ -12,6 +12,7 @@ import workflowRouter from "./routes/workflow";
 import labelsRouter from "./routes/labels";
 import checklistRouter from "./routes/checklist";
 import activityRouter from "./routes/activity";
+import notificationsRouter from "./routes/notifications";
 import {
   preventTeamMemberWrites,
   requireAuth,
@@ -52,5 +53,6 @@ app.use("/api/workflow", workflowRouter);
 app.use("/api/labels", labelsRouter);
 app.use("/api/checklist", checklistRouter);
 app.use("/api/activity", activityRouter);
+app.use("/api/notifications", notificationsRouter);
 
 export default app;

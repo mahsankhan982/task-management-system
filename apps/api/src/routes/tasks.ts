@@ -7,7 +7,31 @@ const allowedPriorities = ["Critical", "High", "Medium", "Low"];
 router.get("/", async (_req, res) => {
   try {
     const result = await db.query(
-      "SELECT t.*, b.name AS board_name, w.name AS stage_name FROM tasks t JOIN boards b ON b.id = t.board_id JOIN workflow_stages w ON w.id = t.stage_id ORDER BY t.created_at DESC"
+      `SELECT
+         t.*,
+         b.name AS board_name,
+         w.name AS stage_name,
+         COALESCE(
+           (
+             SELECT json_agg(
+               json_build_object(
+                 'id', u.id,
+                 'full_name', u.full_name,
+                 'email', u.email,
+                 'role', u.role
+               )
+               ORDER BY u.full_name
+             )
+             FROM task_assignees ta
+             JOIN users u ON u.id = ta.user_id
+             WHERE ta.task_id = t.id
+           ),
+           '[]'::json
+         ) AS assignees
+       FROM tasks t
+       JOIN boards b ON b.id = t.board_id
+       JOIN workflow_stages w ON w.id = t.stage_id
+       ORDER BY t.created_at DESC`
     );
     return res.status(200).json({ success: true, data: result.rows });
   } catch (error) {
@@ -82,6 +106,14 @@ router.post("/", async (req, res) => {
           "INSERT INTO task_assignees (task_id, user_id, assigned_by) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING",
           [task.id, userId, req.user!.id]
         );
+
+        if (userId !== req.user!.id) {
+          await client.query(
+            `INSERT INTO notifications (user_id, task_id, type, title, message)
+             VALUES ($1, $2, 'task_assigned', 'New task assigned', $3)`,
+            [userId, task.id, `Task "${task.title}" was assigned to you.`]
+          );
+        }
       }
     }
 
@@ -115,11 +147,19 @@ router.put("/:id/assignees", async (req, res) => {
     const ids = [...new Set(assignee_ids.map(Number).filter((id: number) => Number.isInteger(id) && id > 0))];
     await client.query("BEGIN");
 
-    const task = await client.query("SELECT id FROM tasks WHERE id = $1", [req.params.id]);
+    const task = await client.query("SELECT id, title FROM tasks WHERE id = $1", [req.params.id]);
     if (!task.rows[0]) {
       await client.query("ROLLBACK");
       return res.status(404).json({ success: false, message: "Task not found" });
     }
+
+    const previousAssignees = await client.query(
+      "SELECT user_id FROM task_assignees WHERE task_id = $1",
+      [req.params.id]
+    );
+    const previousIds = new Set<number>(
+      previousAssignees.rows.map((row) => Number(row.user_id))
+    );
 
     await client.query("DELETE FROM task_assignees WHERE task_id = $1", [req.params.id]);
 
@@ -128,6 +168,18 @@ router.put("/:id/assignees", async (req, res) => {
         "INSERT INTO task_assignees (task_id, user_id, assigned_by) VALUES ($1,$2,$3)",
         [req.params.id, userId, req.user!.id]
       );
+
+      if (!previousIds.has(userId) && userId !== req.user!.id) {
+        await client.query(
+          `INSERT INTO notifications (user_id, task_id, type, title, message)
+           VALUES ($1, $2, 'task_assigned', 'New task assigned', $3)`,
+          [
+            userId,
+            req.params.id,
+            `Task "${task.rows[0].title}" was assigned to you.`,
+          ]
+        );
+      }
     }
 
     await client.query(

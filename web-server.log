@@ -1,0 +1,50 @@
+▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 2.2s
+✓ Running next.config.ts took 99ms
+
+○ Compiling /dashboard/boards ...
+ GET /dashboard/boards 200 in 8.9s (next.js: 8.1s, application-code: 805ms)
+⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /dashboard/boards 200 in 148ms (next.js: 38ms, application-code: 111ms)
+ GET / 200 in 2.5s (next.js: 1854ms, application-code: 611ms)
+ GET /dashboard 200 in 1349ms (next.js: 1278ms, application-code: 71ms)
+ GET /dashboard 200 in 76ms (next.js: 11ms, application-code: 65ms)
+ GET /dashboard/boards?view=board 200 in 89ms (next.js: 31ms, application-code: 58ms)
+ GET /dashboard/boards 200 in 148ms (next.js: 66ms, application-code: 81ms)
+ GET /dashboard/boards 200 in 76ms (next.js: 26ms, application-code: 50ms)
+ GET /dashboard/boards?view=board 200 in 117ms (next.js: 29ms, application-code: 88ms)
+ GET /dashboard/boards?view=board 200 in 309ms (next.js: 235ms, application-code: 74ms)
+ GET /dashboard 200 in 74ms (next.js: 15ms, application-code: 59ms)
+ GET /dashboard/boards 200 in 86ms (next.js: 20ms, application-code: 66ms)
+ GET /dashboard/boards?view=inbox 200 in 114ms (next.js: 23ms, application-code: 91ms)
+ GET /dashboard/boards?view=planner 200 in 104ms (next.js: 24ms, application-code: 80ms)
+ GET /dashboard/boards?view=board 200 in 81ms (next.js: 23ms, application-code: 58ms)
+ GET /dashboard/boards?switch=1 200 in 115ms (next.js: 23ms, application-code: 92ms)
+ GET /dashboard/boards?view=board 200 in 60ms (next.js: 19ms, application-code: 41ms)
+ GET /dashboard/boards?switch=1 200 in 90ms (next.js: 24ms, application-code: 67ms)
+ GET /dashboard/boards?view=board 200 in 69ms (next.js: 21ms, application-code: 47ms)
+ GET /dashboard/boards 200 in 63ms (next.js: 22ms, application-code: 41ms)
+ GET /dashboard/boards 200 in 61ms (next.js: 12ms, application-code: 49ms)
+ GET /dashboard/boards 200 in 360ms (next.js: 20ms, application-code: 339ms)
+ GET /dashboard/boards 200 in 321ms (next.js: 248ms, application-code: 73ms)
+ GET /dashboard/boards?switch=1 200 in 112ms (next.js: 39ms, application-code: 73ms)
+ GET /dashboard/boards?view=board 200 in 107ms (next.js: 22ms, application-code: 85ms)
+ GET /dashboard/boards?view=planner 200 in 113ms (next.js: 25ms, application-code: 88ms)
+ GET /dashboard/boards?view=planner 200 in 107ms (next.js: 21ms, application-code: 85ms)
+ GET /dashboard/boards?view=inbox 200 in 109ms (next.js: 19ms, application-code: 90ms)
+ GET /dashboard/boards?view=board 200 in 102ms (next.js: 24ms, application-code: 78ms)
+^C▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 2.2s
+✓ Running next.config.ts took 88ms
+
+○ Compiling /dashboard/boards ...
+ GET /dashboard/boards 200 in 6.2s (next.js: 5.6s, application-code: 622ms)
+ GET /dashboard/boards 200 in 296ms (next.js: 206ms, application-code: 90ms)
+ GET /dashboard/boards 200 in 388ms (next.js: 25ms, application-code: 363ms)
+ GET /dashboard/boards 200 in 404ms (next.js: 292ms, application-code: 111ms)

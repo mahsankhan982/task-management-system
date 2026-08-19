@@ -7,8 +7,10 @@ import {
   CheckSquare,
   Loader2,
   MessageSquare,
+  Pencil,
   Plus,
   Save,
+  Trash2,
   UserRound,
   X,
 } from "lucide-react";
@@ -80,6 +82,7 @@ type Props = {
 };
 
 const priorities: Priority[] = ["Critical", "High", "Medium", "Low"];
+const modalCoreStageNames = ["To Do", "In Progress", "Waiting for Lead", "Review", "Completed"] as const;
 
 function formatDate(value: string | null) {
   if (!value) return "Not set";
@@ -106,9 +109,11 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
   const [dueDate, setDueDate] = useState("");
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [comment, setComment] = useState("");
+  const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
   const [newChecklist, setNewChecklist] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [posting, setPosting] = useState(false);
   const [addingChecklist, setAddingChecklist] = useState(false);
   const [busyChecklistId, setBusyChecklistId] = useState<string | null>(null);
@@ -137,15 +142,19 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
     }
   }, [taskId]);
 
-  const loadOptions = useCallback(async () => {
+  const loadOptions = useCallback(async (boardId: Id) => {
     try {
       const [workflowResponse, usersResponse] = await Promise.all([
-        apiRequest<{ success: boolean; data: WorkflowStage[] }>("/workflow"),
+        apiRequest<{ success: boolean; data: WorkflowStage[] }>(`/workflow?board_id=${boardId}`),
         apiRequest<{ success: boolean; data: UserOption[] }>("/users"),
       ]);
 
       setWorkflow(
-        (workflowResponse.data ?? []).sort((a, b) => Number(a.position) - Number(b.position)),
+        (workflowResponse.data ?? [])
+          .filter((stage) =>
+            modalCoreStageNames.includes(stage.name as (typeof modalCoreStageNames)[number]),
+          )
+          .sort((a, b) => Number(a.position) - Number(b.position)),
       );
       setUsers((usersResponse.data ?? []).filter((user) => user.is_active !== false));
     } catch (err) {
@@ -156,14 +165,54 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
   useEffect(() => {
     void Promise.resolve().then(() => {
       void loadTask();
-      void loadOptions();
     });
-  }, [loadTask, loadOptions]);
+  }, [loadTask]);
+
+  useEffect(() => {
+    if (!task?.board_id) return;
+
+    void Promise.resolve().then(() => loadOptions(task.board_id));
+  }, [task?.board_id, loadOptions]);
 
   const selectedAssignees = useMemo(
     () => users.filter((user) => assigneeIds.includes(String(user.id))),
     [users, assigneeIds],
   );
+
+  const mentionQuery = useMemo(() => {
+    const match = comment.match(/(?:^|\s)@([^@\n]*)$/);
+    return match ? match[1].trim().toLowerCase() : null;
+  }, [comment]);
+
+  const mentionSuggestions = useMemo(() => {
+    if (mentionQuery === null) return [];
+
+    return users
+      .filter((user) => !mentionedUserIds.includes(String(user.id)))
+      .filter((user) => {
+        if (!mentionQuery) return true;
+        return (
+          user.full_name.toLowerCase().includes(mentionQuery) ||
+          user.email.toLowerCase().includes(mentionQuery)
+        );
+      })
+      .slice(0, 6);
+  }, [users, mentionQuery, mentionedUserIds]);
+
+  function insertMention(user: UserOption) {
+    const atIndex = comment.lastIndexOf("@");
+    if (atIndex < 0) return;
+
+    const nextComment =
+      comment.slice(0, atIndex) + `@${user.full_name} `;
+
+    setComment(nextComment);
+    setMentionedUserIds((current) =>
+      current.includes(String(user.id))
+        ? current
+        : [...current, String(user.id)],
+    );
+  }
 
   async function saveTask() {
     if (!task || (!permissions.editTask && !permissions.moveTask && !permissions.assignTask)) {
@@ -172,6 +221,7 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
 
     try {
       setSaving(true);
+      setSaved(false);
       setError("");
 
       if (permissions.editTask) {
@@ -198,6 +248,8 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
 
       await loadTask();
       await onChanged?.();
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save task");
     } finally {
@@ -220,6 +272,60 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
       await onChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to update checklist");
+    } finally {
+      setBusyChecklistId(null);
+    }
+  }
+
+  async function editChecklist(item: ChecklistItem) {
+    if (!permissions.editTask) return;
+
+    const nextTitle = window.prompt("Edit checklist item:", item.title)?.trim();
+    if (!nextTitle || nextTitle === item.title) return;
+
+    const id = String(item.id);
+
+    try {
+      setBusyChecklistId(id);
+      setError("");
+
+      await apiRequest(`/checklist/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title: nextTitle }),
+      });
+
+      await loadTask(false);
+      await onChanged?.();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to edit checklist item",
+      );
+    } finally {
+      setBusyChecklistId(null);
+    }
+  }
+
+  async function deleteChecklist(item: ChecklistItem) {
+    if (!permissions.editTask) return;
+
+    if (!window.confirm(`Delete checklist item "${item.title}"?`)) return;
+
+    const id = String(item.id);
+
+    try {
+      setBusyChecklistId(id);
+      setError("");
+
+      await apiRequest(`/checklist/${id}`, {
+        method: "DELETE",
+      });
+
+      await loadTask(false);
+      await onChanged?.();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to delete checklist item",
+      );
     } finally {
       setBusyChecklistId(null);
     }
@@ -261,9 +367,16 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
       setError("");
       await apiRequest("/comments", {
         method: "POST",
-        body: JSON.stringify({ task_id: taskId, body }),
+        body: JSON.stringify({
+          task_id: taskId,
+          body,
+          mention_ids: mentionedUserIds
+            .map(Number)
+            .filter((id) => Number.isInteger(id) && id > 0),
+        }),
       });
       setComment("");
+      setMentionedUserIds([]);
       await loadTask(false);
       await onChanged?.();
     } catch (err) {
@@ -271,16 +384,6 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
     } finally {
       setPosting(false);
     }
-  }
-
-  function toggleAssignee(id: Id) {
-    if (!permissions.assignTask) return;
-    const value = String(id);
-    setAssigneeIds((current) =>
-      current.includes(value)
-        ? current.filter((item) => item !== value)
-        : [...current, value],
-    );
   }
 
   return (
@@ -309,10 +412,10 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
                 type="button"
                 onClick={saveTask}
                 disabled={saving}
-                className="flex h-9 items-center gap-2 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white disabled:opacity-60"
+                className={`flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white transition disabled:opacity-60 ${saved ? "bg-emerald-600" : "bg-violet-700"}`}
               >
                 {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-                {saving ? "Saving..." : "Save"}
+                {saving ? "Saving..." : saved ? "Saved" : "Save"}
               </button>
             ) : null}
 
@@ -416,36 +519,35 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
                 </div>
 
                 {permissions.assignTask ? (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {users.map((user) => {
-                      const checked = assigneeIds.includes(String(user.id));
-                      return (
-                        <label
-                          key={String(user.id)}
-                          className="flex cursor-pointer items-center gap-3 rounded-xl border bg-white p-3"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleAssignee(user.id)}
-                          />
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-semibold text-slate-900">
-                              {user.full_name}
-                            </span>
-                            <span className="block truncate text-xs text-slate-500">
-                              {user.role}
-                            </span>
-                          </span>
-                        </label>
-                      );
-                    })}
+                  <div className="mt-3">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Assign Employee
+                    </label>
+
+                    <select
+                      value={assigneeIds[0] ?? ""}
+                      onChange={(event) =>
+                        setAssigneeIds(event.target.value ? [event.target.value] : [])
+                      }
+                      className="mt-2 h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                    >
+                      <option value="">Unassigned</option>
+                      {users.map((user) => (
+                        <option key={String(user.id)} value={String(user.id)}>
+                          {user.full_name} — {user.email} — {user.role}
+                        </option>
+                      ))}
+                    </select>
+
+                    <p className="mt-2 text-xs text-slate-500">
+                      Select one employee to assign this task.
+                    </p>
                   </div>
                 ) : (
                   <div className="mt-3 space-y-2">
                     {task.assignees.length === 0 ? (
                       <div className="rounded-xl border border-dashed p-4 text-sm text-slate-500">
-                        No assignees.
+                        No assignee.
                       </div>
                     ) : (
                       task.assignees.map((assignee) => (
@@ -457,7 +559,9 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
                             <p className="text-sm font-semibold text-slate-900">
                               {assignee.full_name}
                             </p>
-                            <p className="mt-1 text-xs text-slate-500">{assignee.email}</p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              {assignee.email}
+                            </p>
                           </div>
                           <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
                             {assignee.role}
@@ -488,26 +592,56 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
                     </div>
                   ) : (
                     task.checklist.map((item) => (
-                      <label
+                      <div
                         key={String(item.id)}
                         className="flex items-center gap-3 rounded-xl border p-3"
                       >
                         <input
                           type="checkbox"
                           checked={item.is_completed}
-                          disabled={!permissions.editTask || busyChecklistId === String(item.id)}
+                          disabled={
+                            !permissions.editTask ||
+                            busyChecklistId === String(item.id)
+                          }
                           onChange={() => toggleChecklist(item)}
                         />
+
                         <span
                           className={
                             item.is_completed
-                              ? "text-sm text-slate-400 line-through"
-                              : "text-sm text-slate-700"
+                              ? "min-w-0 flex-1 text-sm text-slate-400 line-through"
+                              : "min-w-0 flex-1 text-sm text-slate-700"
                           }
                         >
                           {item.title}
                         </span>
-                      </label>
+
+                        {permissions.editTask ? (
+                          <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => void editChecklist(item)}
+                              disabled={busyChecklistId === String(item.id)}
+                              className="flex h-8 items-center gap-1 rounded-lg border px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                              title="Edit checklist item"
+                            >
+                              <Pencil size={13} />
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => void deleteChecklist(item)}
+                              disabled={busyChecklistId === String(item.id)}
+                              className="flex h-8 items-center gap-1 rounded-lg border border-red-200 px-2 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                              title="Delete checklist item"
+                            >
+                              <Trash2 size={13} />
+                              Delete
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     ))
                   )}
                 </div>
@@ -542,12 +676,50 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
               <form onSubmit={addComment} className="mt-4">
                 <textarea
                   value={comment}
-                  onChange={(event) => setComment(event.target.value)}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setComment(value);
+                    if (!value.includes("@")) setMentionedUserIds([]);
+                  }}
                   disabled={!permissions.comment || posting}
                   rows={3}
                   placeholder="Write a comment..."
                   className="w-full resize-none rounded-xl border bg-white px-3 py-3 text-sm outline-none focus:border-violet-500 disabled:bg-slate-100"
                 />
+
+                {mentionSuggestions.length > 0 ? (
+                  <div className="mt-1 overflow-hidden rounded-xl border border-violet-200 bg-white shadow-lg">
+                    <div className="border-b bg-violet-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-violet-700">
+                      Mention employee
+                    </div>
+
+                    {mentionSuggestions.map((user) => (
+                      <button
+                        key={String(user.id)}
+                        type="button"
+                        onClick={() => insertMention(user)}
+                        className="flex w-full items-center justify-between gap-3 border-b px-3 py-2.5 text-left last:border-b-0 hover:bg-slate-50"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-slate-900">
+                            {user.full_name}
+                          </span>
+                          <span className="block truncate text-xs text-slate-500">
+                            {user.email}
+                          </span>
+                        </span>
+
+                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
+                          {user.role}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Type @ to mention an employee. Mentioned employees receive a notification.
+                </p>
                 <button
                   type="submit"
                   disabled={!permissions.comment || posting || !comment.trim()}

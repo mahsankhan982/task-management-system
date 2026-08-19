@@ -1,0 +1,26 @@
+
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+^C
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
