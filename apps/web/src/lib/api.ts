@@ -53,6 +53,24 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
+  requestPasswordReset: (email: string) =>
+    apiRequest("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  verifyPasswordReset: (email: string, code: string) =>
+    apiRequest("/auth/verify-reset-code", {
+      method: "POST",
+      body: JSON.stringify({ email, code }),
+    }),
+
+  resetPassword: (reset_token: string, new_password: string) =>
+    apiRequest("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ reset_token, new_password }),
+    }),
+
   me: () => apiRequest("/auth/me"),
   teams: () => apiRequest("/teams"),
   users: () => apiRequest("/users"),

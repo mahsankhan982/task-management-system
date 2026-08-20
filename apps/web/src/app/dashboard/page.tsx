@@ -22,6 +22,12 @@ type Team = {
   name: string;
 };
 
+type Board = {
+  id: number;
+  name: string;
+  team_name: string | null;
+};
+
 type Role = "Coordinator" | "Team Lead" | "Team Member";
 
 const workspaces = [
@@ -50,10 +56,25 @@ export default function DashboardPage() {
   const canJoinEmployee = role === "Manager";
 
   const [teams, setTeams] = useState<Team[]>([]);
+  const [boards, setBoards] = useState<Board[]>([]);
   const [showJoin, setShowJoin] = useState(false);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState("");
   const [joinSuccess, setJoinSuccess] = useState("");
+
+  useEffect(() => {
+    void Promise.resolve().then(async () => {
+      try {
+        const response = (await api.boards()) as {
+          success: boolean;
+          data: Board[];
+        };
+        setBoards(response.data ?? []);
+      } catch {
+        setBoards([]);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (!canJoinEmployee) return;
@@ -163,14 +184,20 @@ export default function DashboardPage() {
       <section className="grid gap-5 md:grid-cols-3">
         {workspaces.map((workspace) => {
           const Icon = workspace.icon;
+          const workspaceName = workspace.title.toLowerCase();
 
-          return (
-            <Link
-              key={workspace.title}
-              href={workspace.href}
-              className="group min-h-[170px] rounded-2xl border border-white/40 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-xl"
-            >
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-700 transition group-hover:bg-violet-700 group-hover:text-white">
+          const board = boards.find((item) => {
+            const searchable = `${item.name} ${item.team_name ?? ""}`.toLowerCase();
+            return searchable.includes(workspaceName);
+          });
+
+          const cardContent = (
+            <>
+              <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${
+                board
+                  ? "bg-violet-50 text-violet-700 transition group-hover:bg-violet-700 group-hover:text-white"
+                  : "bg-slate-100 text-slate-400"
+              }`}>
                 <Icon size={21} />
               </div>
 
@@ -179,8 +206,32 @@ export default function DashboardPage() {
               </h2>
 
               <p className="mt-2 text-sm text-slate-500">
-                {workspace.description}
+                {board
+                  ? `Open ${board.name}.`
+                  : "No board data available yet."}
               </p>
+            </>
+          );
+
+          if (!board) {
+            return (
+              <div
+                key={workspace.title}
+                aria-disabled="true"
+                className="min-h-[170px] cursor-not-allowed rounded-2xl border border-white/30 bg-white/80 p-6 opacity-70 shadow-sm"
+              >
+                {cardContent}
+              </div>
+            );
+          }
+
+          return (
+            <Link
+              key={workspace.title}
+              href={`/dashboard/boards?boardId=${board.id}`}
+              className="group min-h-[170px] rounded-2xl border border-white/40 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-xl"
+            >
+              {cardContent}
             </Link>
           );
         })}

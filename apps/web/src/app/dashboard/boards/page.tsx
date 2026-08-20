@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { DragEvent, FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
 import RealTaskModal from "@/components/tasks/real-task-modal";
@@ -70,6 +71,9 @@ const priorityClass: Record<Priority, string> = {
 };
 
 export default function BoardsPage() {
+  const searchParams = useSearchParams();
+  const requestedBoardId = Number(searchParams.get("boardId"));
+
   const { permissions, role } = useRole();
   const canManageBoards = role !== "Team Member";
   const [boards, setBoards] = useState<Board[]>([]);
@@ -108,6 +112,14 @@ export default function BoardsPage() {
 
       setSelectedBoardId((current) => {
         if (current && nextBoards.some((board) => board.id === current)) return current;
+
+        if (
+          Number.isFinite(requestedBoardId) &&
+          nextBoards.some((board) => Number(board.id) === requestedBoardId)
+        ) {
+          return requestedBoardId;
+        }
+
         return nextBoards[0]?.id ?? null;
       });
     } catch (err) {

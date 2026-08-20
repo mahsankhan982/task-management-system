@@ -12,4 +12,11 @@ export const env = {
   DB_PASSWORD: process.env.DB_PASSWORD || "",
   DB_NAME: process.env.DB_NAME || "task_management",
   INSTANCE_UNIX_SOCKET: process.env.INSTANCE_UNIX_SOCKET || "",
+
+  SMTP_HOST: process.env.SMTP_HOST || "",
+  SMTP_PORT: Number(process.env.SMTP_PORT) || 465,
+  SMTP_SECURE: process.env.SMTP_SECURE !== "false",
+  SMTP_USER: process.env.SMTP_USER || "",
+  SMTP_PASS: process.env.SMTP_PASS || "",
+  SMTP_FROM: process.env.SMTP_FROM || process.env.SMTP_USER || "",
 } as const;

@@ -16,12 +16,25 @@ type LoginResponse = {
   };
 };
 
+type ResetStep = "email" | "code" | "password" | "done";
+
 export default function HomePage() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetStep, setResetStep] = useState<ResetStep>("email");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState("");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,6 +51,78 @@ export default function HomePage() {
       setError(err instanceof Error ? err.message : "Unable to sign in");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function openReset() {
+    setResetEmail(email);
+    setResetCode("");
+    setResetToken("");
+    setResetPassword("");
+    setResetConfirm("");
+    setResetError("");
+    setResetStep("email");
+    setResetOpen(true);
+  }
+
+  async function requestCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResetError("");
+    setResetLoading(true);
+
+    try {
+      await api.requestPasswordReset(resetEmail);
+      setResetStep("code");
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : "Unable to send reset code");
+    } finally {
+      setResetLoading(false);
+    }
+  }
+
+  async function verifyCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResetError("");
+    setResetLoading(true);
+
+    try {
+      const response = (await api.verifyPasswordReset(resetEmail, resetCode)) as {
+        success: boolean;
+        reset_token: string;
+      };
+      setResetToken(response.reset_token);
+      setResetStep("password");
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : "Unable to verify code");
+    } finally {
+      setResetLoading(false);
+    }
+  }
+
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResetError("");
+
+    if (resetPassword.length < 8) {
+      setResetError("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (resetPassword !== resetConfirm) {
+      setResetError("New password and confirm password do not match.");
+      return;
+    }
+
+    setResetLoading(true);
+
+    try {
+      await api.resetPassword(resetToken, resetPassword);
+      setPassword("");
+      setResetStep("done");
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : "Unable to reset password");
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -71,9 +156,18 @@ export default function HomePage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-700">
-              Password
-            </label>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={openReset}
+                className="text-sm font-semibold text-blue-600 hover:text-blue-700"
+              >
+                Forgot password?
+              </button>
+            </div>
             <input
               id="password"
               type="password"
@@ -101,6 +195,194 @@ export default function HomePage() {
           </button>
         </form>
       </div>
+
+      {resetOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <button
+            type="button"
+            aria-label="Close password reset"
+            className="absolute inset-0"
+            onClick={() => setResetOpen(false)}
+          />
+
+          <div className="relative z-10 w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl sm:p-8">
+            <button
+              type="button"
+              onClick={() => setResetOpen(false)}
+              className="absolute right-5 top-4 text-2xl text-slate-400 hover:text-slate-700"
+              aria-label="Close"
+            >
+              Ã—
+            </button>
+
+            {resetStep === "email" ? (
+              <form onSubmit={requestCode}>
+                <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
+                  Password Recovery
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                  Forgot password?
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Enter the email registered with your Task Manager account.
+                </p>
+
+                <label className="mt-6 block text-sm font-medium text-slate-700">
+                  Email address
+                  <input
+                    type="email"
+                    required
+                    value={resetEmail}
+                    onChange={(event) => setResetEmail(event.target.value)}
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500"
+                  />
+                </label>
+
+                {resetError ? (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {resetError}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="mt-6 h-12 w-full rounded-xl bg-[#101828] text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {resetLoading ? "Sending..." : "Send 6-digit code"}
+                </button>
+              </form>
+            ) : null}
+
+            {resetStep === "code" ? (
+              <form onSubmit={verifyCode}>
+                <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
+                  Verification
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                  Enter your code
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  We sent a 6-digit code to {resetEmail}. The code expires in 10 minutes.
+                </p>
+
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  required
+                  value={resetCode}
+                  onChange={(event) => setResetCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="000000"
+                  className="mt-6 h-14 w-full rounded-xl border border-slate-300 px-4 text-center text-2xl font-semibold tracking-[0.5em] outline-none focus:border-blue-500"
+                />
+
+                {resetError ? (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {resetError}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={resetLoading || resetCode.length !== 6}
+                  className="mt-6 h-12 w-full rounded-xl bg-[#101828] text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {resetLoading ? "Verifying..." : "Verify code"}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetError("");
+                    setResetStep("email");
+                  }}
+                  className="mt-3 h-10 w-full text-sm font-semibold text-blue-600"
+                >
+                  Send another code
+                </button>
+              </form>
+            ) : null}
+
+            {resetStep === "password" ? (
+              <form onSubmit={changePassword}>
+                <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
+                  New Password
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                  Create a new password
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Use at least 8 characters.
+                </p>
+
+                <label className="mt-6 block text-sm font-medium text-slate-700">
+                  New password
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={resetPassword}
+                    onChange={(event) => setResetPassword(event.target.value)}
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500"
+                  />
+                </label>
+
+                <label className="mt-4 block text-sm font-medium text-slate-700">
+                  Confirm password
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={resetConfirm}
+                    onChange={(event) => setResetConfirm(event.target.value)}
+                    className="mt-2 h-12 w-full rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-500"
+                  />
+                </label>
+
+                {resetError ? (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {resetError}
+                  </div>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="mt-6 h-12 w-full rounded-xl bg-[#101828] text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {resetLoading ? "Changing password..." : "Change password"}
+                </button>
+              </form>
+            ) : null}
+
+            {resetStep === "done" ? (
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wider text-emerald-600">
+                  Password Updated
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-950">
+                  Your password has been changed
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  You can now sign in with your new password.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail(resetEmail);
+                    setResetOpen(false);
+                  }}
+                  className="mt-6 h-12 w-full rounded-xl bg-[#101828] text-sm font-semibold text-white"
+                >
+                  Back to sign in
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
