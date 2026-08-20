@@ -3,6 +3,14 @@ import { db } from "../db/pool";
 
 const router = Router();
 
+const defaultWorkflow = [
+  ["To Do", 1],
+  ["In Progress", 2],
+  ["Waiting for Lead", 3],
+  ["Review", 4],
+  ["Completed", 5],
+] as const;
+
 router.get("/", async (_req, res) => {
   try {
     const result = await db.query(
@@ -16,6 +24,8 @@ router.get("/", async (_req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  const client = await db.connect();
+
   try {
     const { name, description, team_id } = req.body;
 
@@ -23,22 +33,37 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ success: false, message: "Board name is required" });
     }
 
-    const result = await db.query(
+    await client.query("BEGIN");
+
+    const result = await client.query(
       "INSERT INTO boards (name, description, team_id, created_by) VALUES ($1, $2, $3, $4) RETURNING *",
       [name.trim(), description ?? null, team_id ?? null, req.user!.id]
     );
 
-    return res.status(201).json({ success: true, data: result.rows[0] });
+    const board = result.rows[0];
+
+    for (const [stageName, position] of defaultWorkflow) {
+      await client.query(
+        "INSERT INTO workflow_stages (board_id, name, position) VALUES ($1, $2, $3)",
+        [board.id, stageName, position]
+      );
+    }
+
+    await client.query("COMMIT");
+    return res.status(201).json({ success: true, data: board });
   } catch (error: any) {
+    await client.query("ROLLBACK");
+
     if (error?.code === "23503") {
       return res.status(400).json({ success: false, message: "Invalid team or creator" });
     }
 
     console.error("Create board failed:", error);
     return res.status(500).json({ success: false, message: "Unable to create board" });
+  } finally {
+    client.release();
   }
 });
-
 
 router.patch("/:id", async (req, res) => {
   try {

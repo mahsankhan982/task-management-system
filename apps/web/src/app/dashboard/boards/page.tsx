@@ -163,16 +163,20 @@ export default function BoardsPage() {
         .map((stage) => Number(stage!.id)),
     );
 
-    const extraIds = boardWorkflow
+    const customLists = boardWorkflow
       .filter((stage) => !coreIds.has(Number(stage.id)))
-      .map((stage) => Number(stage.id));
+      .map((stage) => ({
+        id: Number(stage.id),
+        name: stage.name,
+        stageIds: [Number(stage.id)],
+      }));
 
     return [
       toDo
         ? {
             id: Number(toDo.id),
             name: "To Do",
-            stageIds: [Number(toDo.id), ...extraIds],
+            stageIds: [Number(toDo.id)],
           }
         : null,
       inProgress
@@ -198,6 +202,7 @@ export default function BoardsPage() {
             stageIds: [Number(completed.id)],
           }
         : null,
+      ...customLists,
     ].filter(Boolean) as Array<{
       id: number;
       name: string;
@@ -373,6 +378,27 @@ export default function BoardsPage() {
           ? err.message
           : "Unable to delete board. Delete or move its tasks first.",
       );
+    }
+  }
+
+  async function createList() {
+    if (!canManageBoards || !selectedBoardId) return;
+
+    const name = window.prompt("List name:")?.trim();
+    if (!name) return;
+
+    try {
+      setError("");
+      await apiRequest("/workflow", {
+        method: "POST",
+        body: JSON.stringify({
+          board_id: selectedBoardId,
+          name,
+        }),
+      });
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to create list");
     }
   }
 
@@ -593,6 +619,17 @@ export default function BoardsPage() {
                   </section>
                 );
               })}
+
+              {canManageBoards && selectedBoardId ? (
+                <button
+                  type="button"
+                  onClick={createList}
+                  className="flex h-11 w-[210px] shrink-0 items-center justify-center gap-2 rounded-xl border border-white/40 bg-white/20 px-4 text-sm font-semibold text-white transition hover:bg-white/30"
+                >
+                  <Plus size={17} />
+                  Add list
+                </button>
+              ) : null}
             </div>
           </div>
         )}

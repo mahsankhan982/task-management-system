@@ -34,19 +34,19 @@ const workspaces = [
   {
     title: "Creative",
     description: "Open the Creative workspace.",
-    href: "/dashboard/creative",
+    aliases: ["creative", "crative"],
     icon: Palette,
   },
   {
     title: "Website",
     description: "Open the Website workspace.",
-    href: "/dashboard/website",
+    aliases: ["website", "web site"],
     icon: Code2,
   },
   {
     title: "Digital",
     description: "Open the Digital workspace.",
-    href: "/dashboard/digital",
+    aliases: ["digital"],
     icon: Megaphone,
   },
 ];
@@ -184,11 +184,10 @@ export default function DashboardPage() {
       <section className="grid gap-5 md:grid-cols-3">
         {workspaces.map((workspace) => {
           const Icon = workspace.icon;
-          const workspaceName = workspace.title.toLowerCase();
 
           const board = boards.find((item) => {
             const searchable = `${item.name} ${item.team_name ?? ""}`.toLowerCase();
-            return searchable.includes(workspaceName);
+            return workspace.aliases.some((alias) => searchable.includes(alias));
           });
 
           const cardContent = (
