@@ -103,21 +103,53 @@ export default function BoardsPage() {
         { success: boolean; data: Team[] },
       ];
 
-      const nextBoards = boardsResponse.data ?? [];
+      const nextBoards = (boardsResponse.data ?? []).map((board) => ({
+        ...board,
+        id: Number(board.id),
+        team_id: board.team_id === null ? null : Number(board.team_id),
+      }));
+
+      const nextTeams = (teamsResponse.data ?? []).map((team) => ({
+        ...team,
+        id: Number(team.id),
+      }));
+
+      const nextTasks = (tasksResponse.data ?? []).map((task) => ({
+        ...task,
+        id: Number(task.id),
+        board_id: Number(task.board_id),
+        stage_id: Number(task.stage_id),
+      }));
+
+      const nextWorkflow = (workflowResponse.data ?? [])
+        .map((stage) => ({
+          ...stage,
+          id: Number(stage.id),
+          board_id:
+            stage.board_id === undefined
+              ? undefined
+              : Number(stage.board_id),
+          position: Number(stage.position),
+        }))
+        .sort((a, b) => a.position - b.position);
+
       setError("");
       setBoards(nextBoards);
-      setTeams(teamsResponse.data ?? []);
-      setTasks(tasksResponse.data ?? []);
-      setWorkflow((workflowResponse.data ?? []).sort((a, b) => a.position - b.position));
+      setTeams(nextTeams);
+      setTasks(nextTasks);
+      setWorkflow(nextWorkflow);
 
       setSelectedBoardId((current) => {
-        if (current && nextBoards.some((board) => board.id === current)) return current;
-
         if (
           Number.isFinite(requestedBoardId) &&
+          requestedBoardId > 0 &&
           nextBoards.some((board) => Number(board.id) === requestedBoardId)
         ) {
           return requestedBoardId;
+        }
+
+        if (current && nextBoards.some((board) => Number(board.id) === Number(current))) {
+          return Number(current);
         }
 
         return nextBoards[0]?.id ?? null;
@@ -131,7 +163,7 @@ export default function BoardsPage() {
 
   useEffect(() => {
     void Promise.resolve().then(() => loadData());
-  }, []);
+  }, [requestedBoardId]);
 
   const selectedBoard = boards.find((board) => board.id === selectedBoardId);
 

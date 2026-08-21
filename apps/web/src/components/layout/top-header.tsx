@@ -1,8 +1,11 @@
 "use client";
 
 import {
+  ArrowLeft,
   Bell,
   CheckCheck,
+  Download,
+  LogOut,
   Plus,
   Search,
   X,
@@ -16,7 +19,7 @@ import {
 } from "react";
 
 import { useRole } from "@/contexts/role-context";
-import { apiRequest } from "@/lib/api";
+import { apiRequest, clearAuthToken } from "@/lib/api";
 
 type NotificationItem = {
   id: number | string;
@@ -26,6 +29,14 @@ type NotificationItem = {
   message: string;
   is_read: boolean;
   created_at: string;
+};
+
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{
+    outcome: "accepted" | "dismissed";
+    platform: string;
+  }>;
 };
 
 const getPageTitle = (pathname: string) => {
@@ -65,6 +76,20 @@ export default function TopHeader() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    const handleInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPromptEvent);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleInstallPrompt);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleInstallPrompt);
+    };
+  }, []);
 
   const loadNotifications = useCallback(async () => {
     try {
@@ -131,6 +156,26 @@ export default function TopHeader() {
     }
   }
 
+  async function installApp() {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      await installPrompt.userChoice;
+      setInstallPrompt(null);
+      return;
+    }
+
+    window.alert(
+      "Install Task Manager: Chrome/Edge menu > Install app. Android: browser menu > Install app/Add to Home screen. iPhone: Safari > Share > Add to Home Screen.",
+    );
+  }
+
+  function logout() {
+    clearAuthToken();
+    localStorage.removeItem("task_management_user");
+    router.replace("/");
+    router.refresh();
+  }
+
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4 text-slate-700 shadow-sm">
       <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
@@ -145,6 +190,18 @@ export default function TopHeader() {
           <p className="text-[10px] text-slate-400">{pageTitle}</p>
         </div>
       </Link>
+
+      {pathname !== "/dashboard" ? (
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard")}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+          title="Back to workspace dashboard"
+          aria-label="Back to workspace dashboard"
+        >
+          <ArrowLeft size={18} />
+        </button>
+      ) : null}
 
       <div className="mx-auto hidden w-full max-w-2xl items-center md:flex">
         <div className="flex h-9 w-full items-center gap-2 rounded-md border border-slate-300 bg-slate-50 px-3 focus-within:border-[#0c66e4] focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-100">
@@ -167,6 +224,16 @@ export default function TopHeader() {
           Create
         </Link>
       ) : null}
+
+      <button
+        type="button"
+        onClick={() => void installApp()}
+        className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+        title="Install Task Manager"
+        aria-label="Install Task Manager"
+      >
+        <Download size={17} />
+      </button>
 
       <div className="relative">
         <button
@@ -286,10 +353,20 @@ export default function TopHeader() {
 
       <div
         className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0c66e4] text-[11px] font-bold text-white ring-2 ring-blue-100"
-        title={`${user.full_name} · ${user.role}`}
+        title={`${user.full_name} Â· ${user.role}`}
       >
         {initials(user.full_name)}
       </div>
+
+      <button
+        type="button"
+        onClick={logout}
+        className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
+        title="Logout"
+        aria-label="Logout"
+      >
+        <LogOut size={17} />
+      </button>
     </header>
   );
 }
