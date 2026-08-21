@@ -87,6 +87,7 @@ export default function BoardsPage() {
   const [creating, setCreating] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [selectedTaskInitialEdit, setSelectedTaskInitialEdit] = useState(false);
 
   async function loadData() {
     try {
@@ -305,7 +306,10 @@ export default function BoardsPage() {
     setError("");
 
     try {
-      await apiRequest("/tasks", {
+      const result = await apiRequest<{
+        success: boolean;
+        data: { id: number | string };
+      }>("/tasks", {
         method: "POST",
         body: JSON.stringify({
           board_id: selectedBoardId,
@@ -318,6 +322,11 @@ export default function BoardsPage() {
       formElement.reset();
       setShowCreate(false);
       await loadData();
+
+      if (result.data?.id) {
+        setSelectedTaskInitialEdit(true);
+        setSelectedTaskId(Number(result.data.id));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create task");
     } finally {
@@ -484,18 +493,6 @@ export default function BoardsPage() {
           </div>
         </div>
 
-        {permissions.createTask && selectedBoardId ? (
-          <div className="mb-3 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setShowCreate((value) => !value)}
-              className="flex h-11 items-center gap-2 rounded-xl bg-violet-700 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-800"
-            >
-              <Plus size={17} />
-              {showCreate ? "Close Add Task" : "Add Task"}
-            </button>
-          </div>
-        ) : null}
 
         {error ? (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -596,7 +593,10 @@ export default function BoardsPage() {
                         <article
                           key={task.id}
                           draggable={permissions.moveTask}
-                          onClick={() => setSelectedTaskId(task.id)}
+                          onClick={() => {
+                            setSelectedTaskInitialEdit(false);
+                            setSelectedTaskId(task.id);
+                          }}
                           onDragStart={(event) => handleDragStart(event, task.id)}
                           onDragEnd={() => setDraggedTaskId(null)}
                           className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md"
@@ -629,6 +629,19 @@ export default function BoardsPage() {
                         </div>
                       ) : null}
                     </div>
+
+                    {stage.name === "To Do" &&
+                    permissions.createTask &&
+                    selectedBoardId ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowCreate((value) => !value)}
+                        className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white/80 px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-400 hover:bg-white hover:text-violet-700"
+                      >
+                        <Plus size={16} />
+                        {showCreate ? "Close Add Task" : "Add Task"}
+                      </button>
+                    ) : null}
                   </section>
                 );
               })}
@@ -650,7 +663,11 @@ export default function BoardsPage() {
         {selectedTaskId ? (
           <RealTaskModal
             taskId={selectedTaskId}
-            onClose={() => setSelectedTaskId(null)}
+            initialEditMode={selectedTaskInitialEdit}
+            onClose={() => {
+              setSelectedTaskInitialEdit(false);
+              setSelectedTaskId(null);
+            }}
             onChanged={loadData}
           />
         ) : null}

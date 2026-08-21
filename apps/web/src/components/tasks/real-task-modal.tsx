@@ -78,6 +78,7 @@ type TaskDetails = {
 
 type Props = {
   taskId: Id;
+  initialEditMode?: boolean;
   onClose: () => void;
   onChanged?: () => void | Promise<void>;
 };
@@ -98,7 +99,12 @@ function dateInputValue(value: string | null) {
   return date.toISOString().slice(0, 10);
 }
 
-export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
+export default function RealTaskModal({
+  taskId,
+  initialEditMode = false,
+  onClose,
+  onChanged,
+}: Props) {
   const { permissions } = useRole();
   const [task, setTask] = useState<TaskDetails | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowStage[]>([]);
@@ -115,7 +121,7 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(initialEditMode);
   const [taskMenuOpen, setTaskMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -165,6 +171,10 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
       setError(err instanceof Error ? err.message : "Unable to load task options");
     }
   }, []);
+
+  useEffect(() => {
+    setEditing(initialEditMode);
+  }, [taskId, initialEditMode]);
 
   useEffect(() => {
     void Promise.resolve().then(() => {
@@ -437,7 +447,9 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
           </div>
 
           <div className="ml-4 flex items-center gap-2">
-            {(permissions.editTask || permissions.moveTask || permissions.assignTask) && task ? (
+            {!editing &&
+            (permissions.editTask || permissions.moveTask || permissions.assignTask) &&
+            task ? (
               <div className="relative">
                 <button
                   type="button"
