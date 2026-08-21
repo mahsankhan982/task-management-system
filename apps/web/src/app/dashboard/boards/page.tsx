@@ -9,7 +9,6 @@ import {
   Pencil,
   Plus,
   Search,
-  Trash2,
   UserRound,
 } from "lucide-react";
 import type { DragEvent, FormEvent } from "react";
@@ -294,7 +293,8 @@ export default function BoardsPage() {
     event.preventDefault();
     if (!selectedBoardId || !permissions.createTask) return;
 
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const title = String(form.get("title") || "").trim();
     const priority = String(form.get("priority") || "Medium") as Priority;
     const stageId = Number(form.get("stage_id"));
@@ -315,7 +315,7 @@ export default function BoardsPage() {
         }),
       });
 
-      event.currentTarget.reset();
+      formElement.reset();
       setShowCreate(false);
       await loadData();
     } catch (err) {
@@ -396,22 +396,6 @@ export default function BoardsPage() {
     }
   }
 
-  async function deleteBoard(board: Board) {
-    if (!canManageBoards) return;
-    if (!window.confirm(`Delete board "${board.name}"?`)) return;
-
-    try {
-      setError("");
-      await apiRequest(`/boards/${board.id}`, { method: "DELETE" });
-      await loadData();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to delete board. Delete or move its tasks first.",
-      );
-    }
-  }
 
   async function createList() {
     if (!canManageBoards || !selectedBoardId) return;
@@ -477,14 +461,7 @@ export default function BoardsPage() {
                   <Pencil size={14} />
                   Edit Board
                 </button>
-                <button
-                  type="button"
-                  onClick={() => deleteBoard(selectedBoard)}
-                  className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
-                >
-                  <Trash2 size={14} />
-                  Delete Board
-                </button>
+
               </>
             ) : null}
 
@@ -503,18 +480,22 @@ export default function BoardsPage() {
               </button>
             ))}
 
-            {permissions.createTask && selectedBoardId ? (
-              <button
-                type="button"
-                onClick={() => setShowCreate((value) => !value)}
-                className="flex items-center gap-2 rounded-lg bg-[#0c66e4] px-4 py-2 text-sm font-semibold text-white"
-              >
-                <Plus size={16} />
-                Create Task
-              </button>
-            ) : null}
+
           </div>
         </div>
+
+        {permissions.createTask && selectedBoardId ? (
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowCreate((value) => !value)}
+              className="flex h-11 items-center gap-2 rounded-xl bg-violet-700 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-800"
+            >
+              <Plus size={17} />
+              {showCreate ? "Close Add Task" : "Add Task"}
+            </button>
+          </div>
+        ) : null}
 
         {error ? (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">

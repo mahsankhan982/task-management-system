@@ -7,6 +7,7 @@ import {
   CheckSquare,
   Loader2,
   MessageSquare,
+  MoreHorizontal,
   Pencil,
   Plus,
   Save,
@@ -114,6 +115,9 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [taskMenuOpen, setTaskMenuOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [posting, setPosting] = useState(false);
   const [addingChecklist, setAddingChecklist] = useState(false);
   const [busyChecklistId, setBusyChecklistId] = useState<string | null>(null);
@@ -248,12 +252,38 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
 
       await loadTask();
       await onChanged?.();
+      setEditing(false);
+      setTaskMenuOpen(false);
       setSaved(true);
       window.setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save task");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteTask() {
+    if (!task || !permissions.editTask) return;
+
+    const confirmed = window.confirm(
+      `Delete task "${task.title}"? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeleting(true);
+      setError("");
+      await apiRequest(`/tasks/${taskId}`, {
+        method: "DELETE",
+      });
+      await onChanged?.();
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete task");
+    } finally {
+      setDeleting(false);
+      setTaskMenuOpen(false);
     }
   }
 
@@ -408,6 +438,53 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
 
           <div className="ml-4 flex items-center gap-2">
             {(permissions.editTask || permissions.moveTask || permissions.assignTask) && task ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setTaskMenuOpen((value) => !value)}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+                  title="Task actions"
+                  aria-label="Task actions"
+                >
+                  <MoreHorizontal size={19} />
+                </button>
+
+                {taskMenuOpen ? (
+                  <div className="absolute right-0 top-11 z-50 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditing(true);
+                        setTaskMenuOpen(false);
+                        window.setTimeout(() => {
+                          document.getElementById("task-title-input")?.focus();
+                        }, 0);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100"
+                    >
+                      <Pencil size={15} />
+                      Edit Task
+                    </button>
+
+                    {permissions.editTask ? (
+                      <button
+                        type="button"
+                        onClick={() => void deleteTask()}
+                        disabled={deleting}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        <Trash2 size={15} />
+                        {deleting ? "Deleting..." : "Delete Task"}
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {editing &&
+            (permissions.editTask || permissions.moveTask || permissions.assignTask) &&
+            task ? (
               <button
                 type="button"
                 onClick={saveTask}
@@ -445,9 +522,10 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
               <div>
                 <label className="text-xs font-semibold uppercase text-slate-400">Title</label>
                 <input
+                  id="task-title-input"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  disabled={!permissions.editTask}
+                  disabled={!editing || !permissions.editTask}
                   className="mt-2 h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:border-violet-500 disabled:bg-slate-50"
                 />
               </div>
@@ -458,7 +536,7 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
                   <select
                     value={stageId}
                     onChange={(event) => setStageId(event.target.value)}
-                    disabled={!permissions.moveTask}
+                    disabled={!editing || !permissions.moveTask}
                     className="mt-2 h-11 w-full rounded-xl border bg-white px-3 text-sm normal-case text-slate-800 disabled:bg-slate-50"
                   >
                     {workflow.map((stage) => (
@@ -474,7 +552,7 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
                   <select
                     value={priority}
                     onChange={(event) => setPriority(event.target.value as Priority)}
-                    disabled={!permissions.editTask}
+                    disabled={!editing || !permissions.editTask}
                     className="mt-2 h-11 w-full rounded-xl border bg-white px-3 text-sm normal-case text-slate-800 disabled:bg-slate-50"
                   >
                     {priorities.map((item) => (
@@ -494,7 +572,7 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
                     type="date"
                     value={dueDate}
                     onChange={(event) => setDueDate(event.target.value)}
-                    disabled={!permissions.editTask}
+                    disabled={!editing || !permissions.editTask}
                     className="mt-2 h-11 w-full rounded-xl border bg-white px-3 text-sm normal-case text-slate-800 disabled:bg-slate-50"
                   />
                 </label>
@@ -505,7 +583,7 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
                 <textarea
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
-                  disabled={!permissions.editTask}
+                  disabled={!editing || !permissions.editTask}
                   rows={5}
                   className="mt-2 w-full resize-none rounded-xl border bg-white p-4 text-sm leading-6 text-slate-700 outline-none focus:border-violet-500 disabled:bg-slate-50"
                   placeholder="No description added."
@@ -529,7 +607,8 @@ export default function RealTaskModal({ taskId, onClose, onChanged }: Props) {
                       onChange={(event) =>
                         setAssigneeIds(event.target.value ? [event.target.value] : [])
                       }
-                      className="mt-2 h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                      disabled={!editing || !permissions.assignTask}
+                      className="mt-2 h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 disabled:bg-slate-50"
                     >
                       <option value="">Unassigned</option>
                       {users.map((user) => (
