@@ -136,6 +136,106 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.patch("/:id/status", async (req, res) => {
+  const client = await db.connect();
+
+  try {
+    if (req.user?.role !== "Team Member") {
+      return res.status(403).json({
+        success: false,
+        message: "This status action is for assigned Team Members",
+      });
+    }
+
+    const { stage_name } = req.body;
+
+    if (!["In Progress", "Completed"].includes(stage_name)) {
+      return res.status(400).json({
+        success: false,
+        message: "Team Members can only set assigned tasks to In Progress or Completed",
+      });
+    }
+
+    await client.query("BEGIN");
+
+    const taskResult = await client.query(
+      `SELECT t.id, t.board_id, t.stage_id, t.title
+       FROM tasks t
+       JOIN task_assignees ta ON ta.task_id = t.id
+       WHERE t.id = $1 AND ta.user_id = $2
+       LIMIT 1
+       FOR UPDATE OF t`,
+      [req.params.id, req.user.id],
+    );
+
+    const task = taskResult.rows[0];
+
+    if (!task) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({
+        success: false,
+        message: "You can only update tasks assigned to you",
+      });
+    }
+
+    const stageResult = await client.query(
+      `SELECT id, name
+       FROM workflow_stages
+       WHERE board_id = $1 AND name = $2
+       LIMIT 1`,
+      [task.board_id, stage_name],
+    );
+
+    const stage = stageResult.rows[0];
+
+    if (!stage) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        message: `The ${stage_name} stage is not available on this board`,
+      });
+    }
+
+    const updated = await client.query(
+      `UPDATE tasks
+       SET stage_id = $1, updated_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [stage.id, task.id],
+    );
+
+    await client.query(
+      `INSERT INTO activity_logs (task_id, user_id, action, details)
+       VALUES ($1,$2,$3,$4::jsonb)`,
+      [
+        task.id,
+        req.user.id,
+        "task_status_updated_by_assignee",
+        JSON.stringify({ stage_name }),
+      ],
+    );
+
+    await client.query("COMMIT");
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        ...updated.rows[0],
+        stage_name: stage.name,
+      },
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Update assigned task status failed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update task status",
+    });
+  } finally {
+    client.release();
+  }
+});
+
 router.put("/:id/assignees", async (req, res) => {
   const client = await db.connect();
   try {

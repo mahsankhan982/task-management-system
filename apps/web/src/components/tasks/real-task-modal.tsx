@@ -105,7 +105,7 @@ export default function RealTaskModal({
   onClose,
   onChanged,
 }: Props) {
-  const { permissions } = useRole();
+  const { permissions, role, user } = useRole();
   const [task, setTask] = useState<TaskDetails | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowStage[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -124,6 +124,7 @@ export default function RealTaskModal({
   const [editing, setEditing] = useState(initialEditMode);
   const [taskMenuOpen, setTaskMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState(false);
   const [posting, setPosting] = useState(false);
   const [addingChecklist, setAddingChecklist] = useState(false);
   const [busyChecklistId, setBusyChecklistId] = useState<string | null>(null);
@@ -191,6 +192,14 @@ export default function RealTaskModal({
   const selectedAssignees = useMemo(
     () => users.filter((user) => assigneeIds.includes(String(user.id))),
     [users, assigneeIds],
+  );
+
+  const isAssignedToMe = useMemo(
+    () =>
+      (task?.assignees ?? []).some(
+        (assignee) => Number(assignee.id) === Number(user.id),
+      ),
+    [task?.assignees, user.id],
   );
 
   const mentionQuery = useMemo(() => {
@@ -270,6 +279,31 @@ export default function RealTaskModal({
       setError(err instanceof Error ? err.message : "Unable to save task");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function updateMyTaskStatus(stageName: "In Progress" | "Completed") {
+    if (role !== "Team Member" || !task || !isAssignedToMe) return;
+
+    try {
+      setStatusUpdating(true);
+      setError("");
+
+      await apiRequest(`/tasks/${taskId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          stage_name: stageName,
+        }),
+      });
+
+      await loadTask();
+      await onChanged?.();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to update task status",
+      );
+    } finally {
+      setStatusUpdating(false);
     }
   }
 
@@ -447,6 +481,44 @@ export default function RealTaskModal({
           </div>
 
           <div className="ml-4 flex items-center gap-2">
+            {role === "Team Member" && task && isAssignedToMe ? (
+              <>
+                {task.stage_name === "Completed" ? (
+                  <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+                    Completed
+                  </span>
+                ) : task.stage_name === "In Progress" ? (
+                  <button
+                    type="button"
+                    onClick={() => void updateMyTaskStatus("Completed")}
+                    disabled={statusUpdating}
+                    className="flex h-9 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {statusUpdating ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <CheckSquare size={15} />
+                    )}
+                    {statusUpdating ? "Updating..." : "Mark Complete"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void updateMyTaskStatus("In Progress")}
+                    disabled={statusUpdating}
+                    className="flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {statusUpdating ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <Activity size={15} />
+                    )}
+                    {statusUpdating ? "Updating..." : "Start Work"}
+                  </button>
+                )}
+              </>
+            ) : null}
+
             {!editing &&
             (permissions.editTask || permissions.moveTask || permissions.assignTask) &&
             task ? (
