@@ -81,6 +81,10 @@ export function preventTeamMemberWrites(req: Request, res: Response, next: NextF
     return next();
   }
 
+  if (req.path.startsWith("/api/attachments")) {
+    return next();
+  }
+
   if (
     req.user?.role === "Team Member" &&
     req.method === "PATCH" &&
@@ -92,7 +96,7 @@ export function preventTeamMemberWrites(req: Request, res: Response, next: NextF
   if (req.user?.role === "Team Member") {
     return res.status(403).json({
       success: false,
-      message: "Team Members have read-only access except for comments and their assigned task status",
+      message: "Team Members have read-only access except for comments, attachments on assigned tasks, and their assigned task status",
     });
   }
 
