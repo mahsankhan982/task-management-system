@@ -965,7 +965,7 @@ export default function RealTaskModal({
                           className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3"
                         >
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
-                            <AttachmentIcon size={18} />
+                            {isImage ? (<img src={`/api/attachments/${attachment.id}/content`} alt={attachment.file_name || "image"} className="h-10 w-10 rounded-lg object-cover" />) : (<AttachmentIcon size={18} />)}
                           </div>
 
                           <button
@@ -1294,4 +1294,5 @@ export default function RealTaskModal({
     </div>
   );
 }
+
 
