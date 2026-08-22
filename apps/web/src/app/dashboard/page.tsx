@@ -51,9 +51,9 @@ const workspaces = [
     icon: Megaphone,
   },
   {
-    title: "CWAY",
-    description: "Open the CWAY workspace.",
-    aliases: ["cway", "ceway", "c-way"],
+    title: "QA",
+    description: "Open the QA workspace.",
+    aliases: ["qa"],
     icon: Waypoints,
   },
 ];
