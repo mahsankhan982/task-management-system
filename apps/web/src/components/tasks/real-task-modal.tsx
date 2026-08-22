@@ -938,7 +938,7 @@ export default function RealTaskModal({
                 <div className="mt-4 space-y-2">
                   {attachments.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
-                      No attachments yet.`r`n                      Upload images, files or links here. Click uploaded images to open.
+                      No attachments yet. Upload images, files or links here. Click uploaded images to open.
                     </div>
                   ) : (
                     attachments.map((attachment) => {
@@ -1294,5 +1294,6 @@ export default function RealTaskModal({
     </div>
   );
 }
+
 
 
