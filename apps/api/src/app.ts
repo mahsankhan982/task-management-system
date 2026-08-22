@@ -1,4 +1,4 @@
-import express from "express";
+import express, { type NextFunction, type Request, type Response } from "express";
 import cors from "cors";
 
 import { env } from "./config/env";
@@ -20,13 +20,22 @@ import {
   requireManagerWrites,
 } from "./middleware/auth";
 
+const DEFAULT_BODY_LIMIT = "1mb";
+const COMMENT_BODY_LIMIT = "2mb";
+
 const app = express();
 
 app.disable("x-powered-by");
 
 app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
-app.use(express.json({ limit: "1mb" }));
-app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+// Comments can carry long write-ups, so they get a larger body budget than
+// the rest of the API. This parser has to run before the global 1mb one:
+// once it has parsed the body, body-parser marks the request and the global
+// parser below skips it instead of rejecting the payload as too large.
+app.use("/api/comments", express.json({ limit: COMMENT_BODY_LIMIT }));
+app.use(express.json({ limit: DEFAULT_BODY_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: DEFAULT_BODY_LIMIT }));
 
 app.get("/api/health", (_req, res) => {
   res.status(200).json({
@@ -56,5 +65,23 @@ app.use("/api/checklist", checklistRouter);
 app.use("/api/activity", activityRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/attachments", attachmentsRouter);
+
+// body-parser rejects oversized payloads with an HTML error page by default,
+// which the client surfaces as a bare status code. Answer in JSON instead so
+// the UI can show why the request was refused.
+app.use((error: any, req: Request, res: Response, next: NextFunction) => {
+  if (error?.type === "entity.too.large") {
+    const limit = req.path.startsWith("/api/comments")
+      ? COMMENT_BODY_LIMIT
+      : DEFAULT_BODY_LIMIT;
+
+    return res.status(413).json({
+      success: false,
+      message: `That content is too large. The limit is ${limit.toUpperCase()}.`,
+    });
+  }
+
+  return next(error);
+});
 
 export default app;
