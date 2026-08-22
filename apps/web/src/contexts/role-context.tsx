@@ -10,6 +10,7 @@ type AuthUser = {
   email: string;
   role: UserRole;
   team_id: number | null;
+  avatar_url?: string | null;
 };
 
 type RoleContextValue = {

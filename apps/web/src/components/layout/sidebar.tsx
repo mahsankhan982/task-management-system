@@ -3,6 +3,8 @@
 import { Activity, LayoutDashboard, LogOut, PanelsTopLeft, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import ChakorLogo from "@/components/brand/chakor-logo";
+import UserAvatar from "@/components/brand/user-avatar";
 import { useRole } from "@/contexts/role-context";
 import { clearAuthToken } from "@/lib/api";
 
@@ -12,15 +14,6 @@ const navigation = [
   { name: "Teams", href: "/dashboard/teams", icon: Users },
   { name: "Activity", href: "/dashboard/activity", icon: Activity },
 ];
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("") || "TM";
-}
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -37,9 +30,7 @@ export default function Sidebar() {
     <aside className="hidden h-[calc(100vh-4rem)] w-[260px] shrink-0 border-r border-slate-200 bg-[#fafbfc] lg:flex lg:flex-col">
       <div className="flex h-[72px] items-center border-b border-slate-200 bg-white px-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0c66e4] text-sm font-bold text-white shadow-sm">
-            TM
-          </div>
+          <ChakorLogo size={40} />
           <div>
             <p className="text-sm font-semibold text-slate-950">Task Manager</p>
             <p className="text-xs text-slate-400">Workspace</p>
@@ -89,9 +80,11 @@ export default function Sidebar() {
 
       <div className="border-t border-slate-100 p-4">
         <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0c66e4] text-xs font-semibold text-white">
-            {initials(user.full_name)}
-          </div>
+          <UserAvatar
+            name={user.full_name}
+            avatarUrl={user.avatar_url}
+            size={36}
+          />
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-slate-900">{user.full_name}</p>
             <p className="truncate text-xs text-slate-400">{user.email}</p>

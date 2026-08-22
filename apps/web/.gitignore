@@ -47,3 +47,6 @@ dist/
 .env.*
 **/.env
 **/.env.*
+
+# Keep the documented example env in version control.
+!.env.example

@@ -2,6 +2,8 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import GoogleSignIn from "@/components/auth/google-sign-in";
+import ChakorLogo from "@/components/brand/chakor-logo";
 import { api, setAuthToken } from "@/lib/api";
 
 type LoginResponse = {
@@ -13,6 +15,7 @@ type LoginResponse = {
     email: string;
     role: string;
     team_id: number | null;
+    avatar_url?: string | null;
   };
 };
 
@@ -49,6 +52,23 @@ export default function HomePage() {
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGoogleCredential(credential: string) {
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = (await api.loginWithGoogle(credential)) as LoginResponse;
+      setAuthToken(response.token);
+      localStorage.setItem("task_management_user", JSON.stringify(response.user));
+      router.push("/dashboard");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to sign in with Google");
     } finally {
       setLoading(false);
     }
@@ -129,6 +149,8 @@ export default function HomePage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f6f7fb] p-6">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
+        <ChakorLogo size={56} rounded="rounded-2xl" priority className="mb-6" />
+
         <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
           Task Management System
         </p>
@@ -194,6 +216,11 @@ export default function HomePage() {
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
+
+        <GoogleSignIn
+          onCredential={handleGoogleCredential}
+          disabled={loading}
+        />
       </div>
 
       {resetOpen ? (

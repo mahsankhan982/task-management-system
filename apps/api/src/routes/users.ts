@@ -9,7 +9,7 @@ const allowedRoles = ["Manager", "Coordinator", "Team Lead", "Team Member"];
 router.get("/", async (_req, res) => {
   try {
     const result = await db.query(
-      "SELECT id, full_name, email, role, team_id, is_active, created_at, updated_at FROM users ORDER BY full_name ASC"
+      "SELECT id, full_name, email, role, team_id, is_active, avatar_url, created_at, updated_at FROM users ORDER BY full_name ASC"
     );
     return res.status(200).json({ success: true, data: result.rows });
   } catch (error) {

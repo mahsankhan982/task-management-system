@@ -18,6 +18,8 @@ import {
   useState,
 } from "react";
 
+import ChakorLogo from "@/components/brand/chakor-logo";
+import UserAvatar from "@/components/brand/user-avatar";
 import { useRole } from "@/contexts/role-context";
 import { apiRequest, clearAuthToken } from "@/lib/api";
 
@@ -48,17 +50,6 @@ const getPageTitle = (pathname: string) => {
   if (pathname.startsWith("/dashboard/digital")) return "Digital";
   return "Dashboard";
 };
-
-function initials(name: string) {
-  return (
-    name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase())
-      .join("") || "TM"
-  );
-}
 
 function formatTime(value: string) {
   const date = new Date(value);
@@ -179,9 +170,7 @@ export default function TopHeader() {
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4 text-slate-700 shadow-sm">
       <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0c66e4] text-xs font-black text-white shadow-sm">
-          TM
-        </div>
+        <ChakorLogo size={32} priority />
 
         <div className="min-w-0 leading-tight">
           <p className="truncate text-sm font-bold text-slate-900">
@@ -351,12 +340,12 @@ export default function TopHeader() {
         <p className="text-[10px] text-slate-400">{user.role}</p>
       </div>
 
-      <div
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0c66e4] text-[11px] font-bold text-white ring-2 ring-blue-100"
-        title={`${user.full_name} Â· ${user.role}`}
-      >
-        {initials(user.full_name)}
-      </div>
+      <UserAvatar
+        name={user.full_name}
+        avatarUrl={user.avatar_url}
+        size={36}
+        title={`${user.full_name} · ${user.role}`}
+      />
 
       <button
         type="button"
