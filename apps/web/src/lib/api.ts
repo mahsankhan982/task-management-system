@@ -77,12 +77,6 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
-  loginWithGoogle: (credential: string) =>
-    apiRequest("/auth/google", {
-      method: "POST",
-      body: JSON.stringify({ credential }),
-    }),
-
   requestPasswordReset: (email: string) =>
     apiRequest("/auth/forgot-password", {
       method: "POST",

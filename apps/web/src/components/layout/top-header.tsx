@@ -19,7 +19,6 @@ import {
 } from "react";
 
 import ChakorLogo from "@/components/brand/chakor-logo";
-import UserAvatar from "@/components/brand/user-avatar";
 import { useRole } from "@/contexts/role-context";
 import { apiRequest, clearAuthToken } from "@/lib/api";
 
@@ -50,6 +49,17 @@ const getPageTitle = (pathname: string) => {
   if (pathname.startsWith("/dashboard/digital")) return "Digital";
   return "Dashboard";
 };
+
+function initials(name: string) {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("") || "CK"
+  );
+}
 
 function formatTime(value: string) {
   const date = new Date(value);
@@ -340,12 +350,12 @@ export default function TopHeader() {
         <p className="text-[10px] text-slate-400">{user.role}</p>
       </div>
 
-      <UserAvatar
-        name={user.full_name}
-        avatarUrl={user.avatar_url}
-        size={36}
-        title={`${user.full_name} · ${user.role}`}
-      />
+      <div
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0c66e4] text-[11px] font-bold text-white ring-2 ring-blue-100"
+        title={`${user.full_name} Â· ${user.role}`}
+      >
+        {initials(user.full_name)}
+      </div>
 
       <button
         type="button"

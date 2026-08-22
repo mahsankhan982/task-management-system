@@ -5,7 +5,6 @@ import nodemailer from "nodemailer";
 import { createHash, randomInt } from "crypto";
 import { db } from "../db/pool";
 import { env } from "../config/env";
-import { isGoogleSignInConfigured, verifyGoogleIdToken } from "../lib/google-auth";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
@@ -45,7 +44,7 @@ router.post("/login", async (req, res) => {
     }
 
     const result = await db.query(
-      "SELECT id, full_name, email, password_hash, role, team_id, is_active, avatar_url FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
+      "SELECT id, full_name, email, password_hash, role, team_id, is_active FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
       [String(email).trim()]
     );
 
@@ -89,107 +88,11 @@ router.post("/login", async (req, res) => {
         email: user.email,
         role: user.role,
         team_id: user.team_id === null ? null : Number(user.team_id),
-        avatar_url: user.avatar_url ?? null,
       },
     });
   } catch (error) {
     console.error("Login failed:", error);
     return res.status(500).json({ success: false, message: "Unable to login" });
-  }
-});
-
-router.post("/google", async (req, res) => {
-  try {
-    if (!isGoogleSignInConfigured()) {
-      return res.status(503).json({
-        success: false,
-        message: "Google sign-in is not configured on this server",
-      });
-    }
-
-    const credential = String(req.body?.credential ?? "").trim();
-
-    if (!credential) {
-      return res.status(400).json({ success: false, message: "Google credential is required" });
-    }
-
-    let profile;
-
-    try {
-      profile = await verifyGoogleIdToken(credential);
-    } catch (error) {
-      console.error("Google token verification failed:", error);
-      return res.status(401).json({ success: false, message: "Google sign-in could not be verified" });
-    }
-
-    if (!profile.email_verified) {
-      return res.status(403).json({
-        success: false,
-        message: "This Google account does not have a verified email address",
-      });
-    }
-
-    // Accounts are provisioned by a Manager, so Google sign-in links to an
-    // existing user rather than creating one.
-    const result = await db.query(
-      "SELECT id, full_name, email, role, team_id, is_active FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1",
-      [profile.email]
-    );
-
-    const user = result.rows[0];
-
-    if (!user) {
-      return res.status(403).json({
-        success: false,
-        message: `No workspace account exists for ${profile.email}. Ask your manager to add you first.`,
-      });
-    }
-
-    if (!user.is_active) {
-      return res.status(403).json({ success: false, message: "Account is inactive" });
-    }
-
-    if (!env.JWT_SECRET) {
-      throw new Error("JWT_SECRET is not configured");
-    }
-
-    // Refresh the cached Google photo on every sign-in so it stays current.
-    const updated = await db.query(
-      `UPDATE users
-       SET avatar_url = $1, google_id = $2, updated_at = NOW()
-       WHERE id = $3
-       RETURNING id, full_name, email, role, team_id, avatar_url`,
-      [profile.picture, profile.google_id, user.id]
-    );
-
-    const account = updated.rows[0];
-
-    const token = jwt.sign(
-      {
-        id: Number(account.id),
-        email: account.email,
-        role: account.role,
-        team_id: account.team_id === null ? null : Number(account.team_id),
-      },
-      env.JWT_SECRET,
-      { expiresIn: "8h" }
-    );
-
-    return res.status(200).json({
-      success: true,
-      token,
-      user: {
-        id: Number(account.id),
-        full_name: account.full_name,
-        email: account.email,
-        role: account.role,
-        team_id: account.team_id === null ? null : Number(account.team_id),
-        avatar_url: account.avatar_url,
-      },
-    });
-  } catch (error) {
-    console.error("Google login failed:", error);
-    return res.status(500).json({ success: false, message: "Unable to sign in with Google" });
   }
 });
 
@@ -386,7 +289,7 @@ router.post("/reset-password", async (req, res) => {
 router.get("/me", requireAuth, async (req, res) => {
   try {
     const result = await db.query(
-      "SELECT id, full_name, email, role, team_id, is_active, avatar_url FROM users WHERE id = $1 LIMIT 1",
+      "SELECT id, full_name, email, role, team_id, is_active FROM users WHERE id = $1 LIMIT 1",
       [req.user!.id]
     );
 

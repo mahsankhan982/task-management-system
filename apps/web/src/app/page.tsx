@@ -3,7 +3,6 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import GoogleSignIn from "@/components/auth/google-sign-in";
 import ChakorLogo from "@/components/brand/chakor-logo";
 import { api, setAuthToken } from "@/lib/api";
 
@@ -16,7 +15,6 @@ type LoginResponse = {
     email: string;
     role: string;
     team_id: number | null;
-    avatar_url?: string | null;
   };
 };
 
@@ -54,23 +52,6 @@ export default function HomePage() {
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleGoogleCredential(credential: string) {
-    setError("");
-    setLoading(true);
-
-    try {
-      const response = (await api.loginWithGoogle(credential)) as LoginResponse;
-      setAuthToken(response.token);
-      localStorage.setItem("task_management_user", JSON.stringify(response.user));
-      router.push("/dashboard");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to sign in with Google");
     } finally {
       setLoading(false);
     }
@@ -229,11 +210,6 @@ export default function HomePage() {
             {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-
-        <GoogleSignIn
-          onCredential={handleGoogleCredential}
-          disabled={loading}
-        />
       </div>
 
       {resetOpen ? (

@@ -4,7 +4,6 @@ import { Activity, LayoutDashboard, LogOut, PanelsTopLeft, Users } from "lucide-
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import ChakorLogo from "@/components/brand/chakor-logo";
-import UserAvatar from "@/components/brand/user-avatar";
 import { useRole } from "@/contexts/role-context";
 import { clearAuthToken } from "@/lib/api";
 
@@ -14,6 +13,15 @@ const navigation = [
   { name: "Teams", href: "/dashboard/teams", icon: Users },
   { name: "Activity", href: "/dashboard/activity", icon: Activity },
 ];
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "CK";
+}
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -80,11 +88,9 @@ export default function Sidebar() {
 
       <div className="border-t border-slate-100 p-4">
         <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-          <UserAvatar
-            name={user.full_name}
-            avatarUrl={user.avatar_url}
-            size={36}
-          />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#0c66e4] text-xs font-semibold text-white">
+            {initials(user.full_name)}
+          </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-slate-900">{user.full_name}</p>
             <p className="truncate text-xs text-slate-400">{user.email}</p>

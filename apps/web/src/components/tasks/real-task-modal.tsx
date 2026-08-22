@@ -21,7 +21,6 @@ import {
   Video,
   X,
 } from "lucide-react";
-import UserAvatar from "@/components/brand/user-avatar";
 import { apiBlobRequest, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
 
@@ -33,7 +32,6 @@ type Assignee = {
   full_name: string;
   email: string;
   role: string;
-  avatar_url?: string | null;
 };
 
 type UserOption = Assignee & {
@@ -1064,22 +1062,15 @@ export default function RealTaskModal({
                       task.assignees.map((assignee) => (
                         <div
                           key={String(assignee.id)}
-                          className="flex items-center justify-between gap-3 rounded-xl border p-4"
+                          className="flex items-center justify-between rounded-xl border p-4"
                         >
-                          <div className="flex min-w-0 items-center gap-3">
-                            <UserAvatar
-                              name={assignee.full_name}
-                              avatarUrl={assignee.avatar_url}
-                              size={36}
-                            />
-                            <div className="min-w-0">
+                          <div>
                             <p className="text-sm font-semibold text-slate-900">
                               {assignee.full_name}
                             </p>
-                            <p className="mt-1 truncate text-xs text-slate-500">
+                            <p className="mt-1 text-xs text-slate-500">
                               {assignee.email}
                             </p>
-                            </div>
                           </div>
                           <span className="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700">
                             {assignee.role}
