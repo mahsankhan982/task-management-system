@@ -48,3 +48,32 @@
  GET /dashboard/boards 200 in 296ms (next.js: 206ms, application-code: 90ms)
  GET /dashboard/boards 200 in 388ms (next.js: 25ms, application-code: 363ms)
  GET /dashboard/boards 200 in 404ms (next.js: 292ms, application-code: 111ms)
+▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 1823ms
+✓ Running next.config.ts took 88ms
+
+▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 1573ms
+✓ Running next.config.ts took 224ms
+
+^C▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 1540ms
+✓ Running next.config.ts took 109ms
+
+[?25h
+▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 1262ms
+✓ Running next.config.ts took 93ms
+

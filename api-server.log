@@ -24,3 +24,62 @@
  Environment: development
 ========================================
 
+
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+1:26:20 am [tsx] unlink in ./src\app.ts Restarting...
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+^C
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+3:53:48 am [tsx] change in ./src\routes\attachments.ts Restarting...
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
