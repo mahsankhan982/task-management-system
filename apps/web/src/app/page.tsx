@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
+import ChakorLogo from "@/components/brand/chakor-logo";
 import { api, setAuthToken } from "@/lib/api";
 
 type LoginResponse = {
@@ -131,6 +132,8 @@ export default function HomePage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f6f7fb] p-6">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm sm:p-10">
+        <ChakorLogo size={56} rounded="rounded-2xl" priority className="mb-6" />
+
         <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
           Task Management System
         </p>

@@ -3,6 +3,7 @@
 import { Activity, LayoutDashboard, LogOut, PanelsTopLeft, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import ChakorLogo from "@/components/brand/chakor-logo";
 import { useRole } from "@/contexts/role-context";
 import { clearAuthToken } from "@/lib/api";
 
@@ -19,7 +20,7 @@ function initials(name: string) {
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
-    .join("") || "TM";
+    .join("") || "CK";
 }
 
 export default function Sidebar() {
@@ -37,9 +38,7 @@ export default function Sidebar() {
     <aside className="hidden h-[calc(100vh-4rem)] w-[260px] shrink-0 border-r border-slate-200 bg-[#fafbfc] lg:flex lg:flex-col">
       <div className="flex h-[72px] items-center border-b border-slate-200 bg-white px-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#0c66e4] text-sm font-bold text-white shadow-sm">
-            TM
-          </div>
+          <ChakorLogo size={40} />
           <div>
             <p className="text-sm font-semibold text-slate-950">Task Manager</p>
             <p className="text-xs text-slate-400">Workspace</p>

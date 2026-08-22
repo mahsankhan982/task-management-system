@@ -8,11 +8,11 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
-      { url: "/icons/task-manager-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/task-manager-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/icons/chakor-logo-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/chakor-logo-512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: [
-      { url: "/icons/task-manager-180.png", sizes: "180x180", type: "image/png" },
+      { url: "/icons/chakor-logo-180.png", sizes: "180x180", type: "image/png" },
     ],
   },
 };

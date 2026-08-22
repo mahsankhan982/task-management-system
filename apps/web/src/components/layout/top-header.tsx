@@ -18,6 +18,7 @@ import {
   useState,
 } from "react";
 
+import ChakorLogo from "@/components/brand/chakor-logo";
 import { useRole } from "@/contexts/role-context";
 import { apiRequest, clearAuthToken } from "@/lib/api";
 
@@ -56,7 +57,7 @@ function initials(name: string) {
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
-      .join("") || "TM"
+      .join("") || "CK"
   );
 }
 
@@ -179,9 +180,7 @@ export default function TopHeader() {
   return (
     <header className="sticky top-0 z-50 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4 text-slate-700 shadow-sm">
       <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0c66e4] text-xs font-black text-white shadow-sm">
-          TM
-        </div>
+        <ChakorLogo size={32} priority />
 
         <div className="min-w-0 leading-tight">
           <p className="truncate text-sm font-bold text-slate-900">
