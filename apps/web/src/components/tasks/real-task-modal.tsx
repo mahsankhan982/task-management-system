@@ -5,17 +5,23 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   CheckSquare,
+  FileText,
+  Image as ImageIcon,
+  Link2,
   Loader2,
   MessageSquare,
   MoreHorizontal,
+  Paperclip,
   Pencil,
   Plus,
   Save,
   Trash2,
+  Upload,
   UserRound,
+  Video,
   X,
 } from "lucide-react";
-import { apiRequest } from "@/lib/api";
+import { apiBlobRequest, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
 
 type Id = number | string;
@@ -57,6 +63,20 @@ type ActivityEntry = {
   id: Id;
   action: string;
   user_name: string | null;
+  created_at: string;
+};
+
+type TaskAttachment = {
+  id: Id;
+  task_id: Id;
+  uploaded_by: Id | null;
+  attachment_type: "file" | "link";
+  file_name: string | null;
+  mime_type: string | null;
+  file_size: number | null;
+  url: string | null;
+  label: string | null;
+  uploader_name: string | null;
   created_at: string;
 };
 
@@ -128,6 +148,11 @@ export default function RealTaskModal({
   const [posting, setPosting] = useState(false);
   const [addingChecklist, setAddingChecklist] = useState(false);
   const [busyChecklistId, setBusyChecklistId] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [attachmentUrl, setAttachmentUrl] = useState("");
+  const [attachmentLabel, setAttachmentLabel] = useState("");
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [error, setError] = useState("");
 
   const loadTask = useCallback(async (syncForm = true) => {
@@ -150,6 +175,21 @@ export default function RealTaskModal({
       setError(err instanceof Error ? err.message : "Unable to load task details");
     } finally {
       setLoading(false);
+    }
+  }, [taskId]);
+
+  const loadAttachments = useCallback(async () => {
+    try {
+      const response = await apiRequest<{
+        success: boolean;
+        data: TaskAttachment[];
+      }>(`/attachments?task_id=${taskId}`);
+
+      setAttachments(response.data ?? []);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to load attachments",
+      );
     }
   }, [taskId]);
 
@@ -188,6 +228,10 @@ export default function RealTaskModal({
 
     void Promise.resolve().then(() => loadOptions(task.board_id));
   }, [task?.board_id, loadOptions]);
+
+  useEffect(() => {
+    void Promise.resolve().then(() => loadAttachments());
+  }, [loadAttachments]);
 
   const selectedAssignees = useMemo(
     () => users.filter((user) => assigneeIds.includes(String(user.id))),
@@ -402,6 +446,138 @@ export default function RealTaskModal({
       );
     } finally {
       setBusyChecklistId(null);
+    }
+  }
+
+  async function uploadAttachment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+
+    if (!attachmentFile || attachmentBusy) return;
+
+    if (attachmentFile.size > 3 * 1024 * 1024) {
+      setError(
+        "Maximum direct upload size is 3 MB. For a larger video, paste its Drive/YouTube/other link instead.",
+      );
+      return;
+    }
+
+    try {
+      setAttachmentBusy(true);
+      setError("");
+
+      const fileData = await attachmentFile.arrayBuffer();
+
+      await apiRequest(
+        `/attachments/file?task_id=${taskId}&file_name=${encodeURIComponent(
+          attachmentFile.name,
+        )}&mime_type=${encodeURIComponent(
+          attachmentFile.type || "application/octet-stream",
+        )}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+          },
+          body: fileData,
+        },
+      );
+
+      setAttachmentFile(null);
+      formElement.reset();
+      await loadAttachments();
+      await loadTask(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to upload attachment",
+      );
+    } finally {
+      setAttachmentBusy(false);
+    }
+  }
+
+  async function addLinkAttachment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const url = attachmentUrl.trim();
+    if (!url || attachmentBusy) return;
+
+    try {
+      setAttachmentBusy(true);
+      setError("");
+
+      await apiRequest("/attachments/link", {
+        method: "POST",
+        body: JSON.stringify({
+          task_id: Number(taskId),
+          url,
+          label: attachmentLabel.trim() || null,
+        }),
+      });
+
+      setAttachmentUrl("");
+      setAttachmentLabel("");
+      await loadAttachments();
+      await loadTask(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to add link");
+    } finally {
+      setAttachmentBusy(false);
+    }
+  }
+
+  async function openAttachment(attachment: TaskAttachment) {
+    try {
+      if (attachment.attachment_type === "link" && attachment.url) {
+        window.open(attachment.url, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      const blob = await apiBlobRequest(`/attachments/${attachment.id}/content`);
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, "_blank", "noopener,noreferrer");
+
+      window.setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 60000);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to open attachment",
+      );
+    }
+  }
+
+  async function deleteAttachment(attachment: TaskAttachment) {
+    const canDelete =
+      role !== "Team Member" ||
+      Number(attachment.uploaded_by) === Number(user.id);
+
+    if (!canDelete) return;
+
+    const name =
+      attachment.label ||
+      attachment.file_name ||
+      attachment.url ||
+      "attachment";
+
+    if (!window.confirm(`Delete attachment "${name}"?`)) return;
+
+    try {
+      setAttachmentBusy(true);
+      setError("");
+
+      await apiRequest(`/attachments/${attachment.id}`, {
+        method: "DELETE",
+      });
+
+      await loadAttachments();
+      await loadTask(false);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to delete attachment",
+      );
+    } finally {
+      setAttachmentBusy(false);
     }
   }
 
@@ -672,6 +848,176 @@ export default function RealTaskModal({
                   className="mt-2 w-full resize-none rounded-xl border bg-white p-4 text-sm leading-6 text-slate-700 outline-none focus:border-violet-500 disabled:bg-slate-50"
                   placeholder="No description added."
                 />
+              </div>
+
+              <div className="mt-6 border-t border-slate-200 pt-6">
+                <div className="flex items-center gap-2">
+                  <Paperclip size={17} />
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Attachments
+                  </h3>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+                    {attachments.length}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  Upload a file, image or small video up to 3 MB. For larger
+                  videos, Google Drive, YouTube or any other resource, add a
+                  link.
+                </p>
+
+                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                  <form
+                    onSubmit={uploadAttachment}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                  >
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Upload file / image / video
+                    </label>
+
+                    <input
+                      type="file"
+                      onChange={(event) =>
+                        setAttachmentFile(event.target.files?.[0] ?? null)
+                      }
+                      className="mt-2 block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-violet-100 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-violet-700"
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={!attachmentFile || attachmentBusy}
+                      className="mt-3 flex h-9 items-center gap-2 rounded-lg bg-violet-700 px-4 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      {attachmentBusy ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Upload size={14} />
+                      )}
+                      Upload
+                    </button>
+                  </form>
+
+                  <form
+                    onSubmit={addLinkAttachment}
+                    className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                  >
+                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Add link
+                    </label>
+
+                    <input
+                      type="url"
+                      required
+                      value={attachmentUrl}
+                      onChange={(event) => setAttachmentUrl(event.target.value)}
+                      placeholder="https://..."
+                      className="mt-2 h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:border-violet-500"
+                    />
+
+                    <input
+                      value={attachmentLabel}
+                      onChange={(event) =>
+                        setAttachmentLabel(event.target.value)
+                      }
+                      placeholder="Display text (optional)"
+                      className="mt-2 h-10 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:border-violet-500"
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={!attachmentUrl.trim() || attachmentBusy}
+                      className="mt-3 flex h-9 items-center gap-2 rounded-lg bg-slate-800 px-4 text-xs font-semibold text-white disabled:opacity-50"
+                    >
+                      <Link2 size={14} />
+                      Add link
+                    </button>
+                  </form>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  {attachments.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
+                      No attachments yet.
+                    </div>
+                  ) : (
+                    attachments.map((attachment) => {
+                      const isImage =
+                        attachment.mime_type?.startsWith("image/") ?? false;
+                      const isVideo =
+                        attachment.mime_type?.startsWith("video/") ?? false;
+                      const AttachmentIcon =
+                        attachment.attachment_type === "link"
+                          ? Link2
+                          : isImage
+                            ? ImageIcon
+                            : isVideo
+                              ? Video
+                              : FileText;
+
+                      const canDelete =
+                        role !== "Team Member" ||
+                        Number(attachment.uploaded_by) === Number(user.id);
+
+                      return (
+                        <div
+                          key={String(attachment.id)}
+                          className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3"
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
+                            <AttachmentIcon size={18} />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => void openAttachment(attachment)}
+                            className="min-w-0 flex-1 text-left"
+                          >
+                            <p className="truncate text-sm font-semibold text-slate-900 hover:text-violet-700">
+                              {attachment.label ||
+                                attachment.file_name ||
+                                attachment.url ||
+                                "Attachment"}
+                            </p>
+
+                            <p className="mt-1 truncate text-xs text-slate-500">
+                              {attachment.attachment_type === "file"
+                                ? `${attachment.mime_type || "File"}${
+                                    attachment.file_size
+                                      ? ` Â· ${Math.max(
+                                          1,
+                                          Math.round(
+                                            Number(attachment.file_size) / 1024,
+                                          ),
+                                        )} KB`
+                                      : ""
+                                  }`
+                                : attachment.url}
+                              {attachment.uploader_name
+                                ? ` Â· Added by ${attachment.uploader_name}`
+                                : ""}
+                            </p>
+                          </button>
+
+                          {canDelete ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void deleteAttachment(attachment)
+                              }
+                              disabled={attachmentBusy}
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                              title="Delete attachment"
+                              aria-label="Delete attachment"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          ) : null}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
 
               <div className="mt-6">

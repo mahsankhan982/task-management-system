@@ -6,6 +6,7 @@ import {
   Megaphone,
   Palette,
   UserPlus,
+  Waypoints,
   X,
 } from "lucide-react";
 import {
@@ -48,6 +49,12 @@ const workspaces = [
     description: "Open the Digital workspace.",
     aliases: ["digital"],
     icon: Megaphone,
+  },
+  {
+    title: "CWAY",
+    description: "Open the CWAY workspace.",
+    aliases: ["cway", "ceway", "c-way"],
+    icon: Waypoints,
   },
 ];
 
@@ -181,7 +188,7 @@ export default function DashboardPage() {
         ) : null}
       </section>
 
-      <section className="grid gap-5 md:grid-cols-3">
+      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
         {workspaces.map((workspace) => {
           const Icon = workspace.icon;
 

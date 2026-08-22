@@ -46,6 +46,30 @@ export async function apiRequest<T>(
   return data as T;
 }
 
+export async function apiBlobRequest(path: string): Promise<Blob> {
+  const token = getAuthToken();
+  const headers = new Headers();
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_URL}${path}`, {
+    method: "GET",
+    headers,
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(
+      data?.message || `Request failed with status ${response.status}`,
+    );
+  }
+
+  return response.blob();
+}
+
 export const api = {
   login: (email: string, password: string) =>
     apiRequest("/auth/login", {

@@ -13,6 +13,7 @@ import labelsRouter from "./routes/labels";
 import checklistRouter from "./routes/checklist";
 import activityRouter from "./routes/activity";
 import notificationsRouter from "./routes/notifications";
+import attachmentsRouter from "./routes/attachments";
 import {
   preventTeamMemberWrites,
   requireAuth,
@@ -54,5 +55,6 @@ app.use("/api/labels", labelsRouter);
 app.use("/api/checklist", checklistRouter);
 app.use("/api/activity", activityRouter);
 app.use("/api/notifications", notificationsRouter);
+app.use("/api/attachments", attachmentsRouter);
 
 export default app;
