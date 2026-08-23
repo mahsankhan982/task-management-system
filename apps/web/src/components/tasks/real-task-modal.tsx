@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   CheckSquare,
-  Download,
   FileText,
   Image as ImageIcon,
   Link2,
@@ -548,7 +547,7 @@ export default function RealTaskModal({
     }
   }
 
-async function downloadAttachment(attachment: TaskAttachment) {`r`n  try {`r`n    const blob = await apiBlobRequest(`/attachments/${attachment.id}/content`);`r`n    const url = URL.createObjectURL(blob);`r`n    const link = document.createElement("a");`r`n    link.href = url;`r`n    link.download = attachment.file_name || attachment.label || "attachment";`r`n    document.body.appendChild(link);`r`n    link.click();`r`n    link.remove();`r`n    URL.revokeObjectURL(url);`r`n  } catch (err) {`r`n    setError(err instanceof Error ? err.message : "Unable to download attachment");`r`n  }`r`n}`r`n`r`n  async function deleteAttachment(attachment: TaskAttachment) {
+  async function deleteAttachment(attachment: TaskAttachment) {
     const canDelete =
       role !== "Team Member" ||
       Number(attachment.uploaded_by) === Number(user.id);
@@ -1000,7 +999,7 @@ async function downloadAttachment(attachment: TaskAttachment) {`r`n  try {`r`n  
                             </p>
                           </button>
 
-                          <button type="button" onClick={() => void downloadAttachment(attachment)} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-violet-50 hover:text-violet-700" title="Download attachment"><Download size={15} /></button>`r`n`r`n                           {canDelete ? (
+                          {canDelete ? (
                             <button
                               type="button"
                               onClick={() =>
@@ -1295,8 +1294,6 @@ async function downloadAttachment(attachment: TaskAttachment) {`r`n  try {`r`n  
     </div>
   );
 }
-
-
 
 
 
