@@ -567,7 +567,6 @@ export default function BoardsPage() {
                   <section
                     key={stage.id}
                     onDragOver={(event) => {
-                      if (!permissions.moveTask) return;
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
                     }}
@@ -675,3 +674,9 @@ export default function BoardsPage() {
     </div>
   );
 }
+
+
+
+
+
+
