@@ -359,7 +359,7 @@ export default function BoardsPage() {
   }
 
   async function createBoard() {
-    if (!canManageBoards) return;
+    if (!permissions.moveTask) return;
 
     const name = window.prompt("Board name:")?.trim();
     if (!name) return;
@@ -383,7 +383,7 @@ export default function BoardsPage() {
   }
 
   async function editBoard(board: Board) {
-    if (!canManageBoards) return;
+    if (!permissions.moveTask) return;
 
     const name = window.prompt("Board name:", board.name)?.trim();
     if (!name) return;
@@ -591,7 +591,7 @@ export default function BoardsPage() {
                       {stageTasks.map((task) => (
                         <article
                           key={task.id}
-                          draggable={permissions.moveTask}
+                          draggable={true}
                           onClick={() => {
                             setSelectedTaskInitialEdit(false);
                             setSelectedTaskId(task.id);
@@ -674,6 +674,9 @@ export default function BoardsPage() {
     </div>
   );
 }
+
+
+
 
 
 
