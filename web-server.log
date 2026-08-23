@@ -77,3 +77,101 @@
 ✓ Ready in 1262ms
 ✓ Running next.config.ts took 93ms
 
+▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 1332ms
+✓ Running next.config.ts took 87ms
+
+▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 1576ms
+✓ Running next.config.ts took 106ms
+
+^C▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 1023ms
+✓ Running next.config.ts took 70ms
+
+^C▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 1374ms
+✓ Running next.config.ts took 108ms
+
+^C▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 1448ms
+✓ Running next.config.ts took 92ms
+
+▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 12.0s
+✓ Running next.config.ts took 638ms
+
+▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 2.6s
+✓ Running next.config.ts took 400ms
+
+▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 2.7s
+✓ Running next.config.ts took 344ms
+
+^C▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 21.9s
+✓ Running next.config.ts took 1080ms
+
+▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 2.8s
+✓ Running next.config.ts took 364ms
+
+▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 7.4s
+✓ Running next.config.ts took 539ms
+
+^C▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 1470ms
+✓ Running next.config.ts took 113ms
+
+^C▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 1765ms
+✓ Running next.config.ts took 102ms
+
+^C▲ Next.js 16.3.0 (webpack)
+- Local:         http://localhost:3000
+- Network:       http://localhost:3000
+- Environments: .env.local
+✓ Ready in 2.3s
+✓ Running next.config.ts took 130ms
+

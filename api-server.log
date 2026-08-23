@@ -24,42 +24,140 @@
  Environment: development
 ========================================
 
+4:43:15 am [tsx] change in ./src\routes\attachments.ts Restarting...
+C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392
+      throw new TypeError('argument handler must be a function')
+            ^
+
+TypeError: argument handler must be a function
+    at router.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392:13)
+    at app.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:222:21)
+    at Array.forEach (<anonymous>)
+    at app.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:219:7)
+    at attachmentsRouter (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:67:5)
+    at Object.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:87:16)
+    at Module._compile (node:internal/modules/cjs/loader:1871:14)
+    at Object.transformer (C:\Users\Chakor\task-management-system\apps\api\node_modules\tsx\dist\register-C557imBs.cjs:9:3619)
+    at Module.load (node:internal/modules/cjs/loader:1594:32)
+    at Module._load (node:internal/modules/cjs/loader:1396:12)
+
+Node.js v24.18.0
+4:46:59 am [tsx] unlink in ./src\routes\attachments.ts Rerunning...
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+4:47:39 am [tsx] change in ./src\routes\attachments.ts Restarting...
+C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392
+      throw new TypeError('argument handler must be a function')
+            ^
+
+TypeError: argument handler must be a function
+    at router.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392:13)
+    at app.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:222:21)
+    at Array.forEach (<anonymous>)
+    at app.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:219:7)
+    at attachmentsRouter (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:67:5)
+    at Object.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:87:16)
+    at Module._compile (node:internal/modules/cjs/loader:1871:14)
+    at Object.transformer (C:\Users\Chakor\task-management-system\apps\api\node_modules\tsx\dist\register-C557imBs.cjs:9:3619)
+    at Module.load (node:internal/modules/cjs/loader:1594:32)
+    at Module._load (node:internal/modules/cjs/loader:1396:12)
+
+Node.js v24.18.0
+4:47:52 am [tsx] change in ./src\routes\attachments.ts Rerunning...
+C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392
+      throw new TypeError('argument handler must be a function')
+            ^
+
+TypeError: argument handler must be a function
+    at router.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392:13)
+    at app.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:222:21)
+    at Array.forEach (<anonymous>)
+    at app.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:219:7)
+    at attachmentsRouter (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:67:5)
+    at Object.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:87:16)
+    at Module._compile (node:internal/modules/cjs/loader:1871:14)
+    at Object.transformer (C:\Users\Chakor\task-management-system\apps\api\node_modules\tsx\dist\register-C557imBs.cjs:9:3619)
+    at Module.load (node:internal/modules/cjs/loader:1594:32)
+    at Module._load (node:internal/modules/cjs/loader:1396:12)
+
+Node.js v24.18.0
+4:50:03 am [tsx] unlink in ./src\routes\attachments.ts Rerunning...
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+4:52:41 am [tsx] change in ./src\routes\attachments.ts Restarting...
+C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392
+      throw new TypeError('argument handler must be a function')
+            ^
+
+TypeError: argument handler must be a function
+    at router.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392:13)
+    at app.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:222:21)
+    at Array.forEach (<anonymous>)
+    at app.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:219:7)
+    at attachmentsRouter (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:67:5)
+    at Object.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:87:16)
+    at Module._compile (node:internal/modules/cjs/loader:1871:14)
+    at Object.transformer (C:\Users\Chakor\task-management-system\apps\api\node_modules\tsx\dist\register-C557imBs.cjs:9:3619)
+    at Module.load (node:internal/modules/cjs/loader:1594:32)
+    at Module._load (node:internal/modules/cjs/loader:1396:12)
+
+Node.js v24.18.0
+^C
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392
+      throw new TypeError('argument handler must be a function')
+            ^
+
+TypeError: argument handler must be a function
+    at router.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392:13)
+    at app.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:222:21)
+    at Array.forEach (<anonymous>)
+    at app.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:219:7)
+    at attachmentsRouter (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:67:5)
+    at Object.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:87:16)
+    at Module._compile (node:internal/modules/cjs/loader:1871:14)
+    at Object.transformer (C:\Users\Chakor\task-management-system\apps\api\node_modules\tsx\dist\register-C557imBs.cjs:9:3619)
+    at Module.load (node:internal/modules/cjs/loader:1594:32)
+    at Module._load (node:internal/modules/cjs/loader:1396:12)
+
+Node.js v24.18.0
 
 > task-management-api@1.0.0 dev
 > tsx watch src/server.ts
 
+C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392
+      throw new TypeError('argument handler must be a function')
+            ^
 
-========================================
- Task Management API
-========================================
- Server:      http://localhost:5000
- Health:      http://localhost:5000/api/health
- Environment: development
-========================================
+TypeError: argument handler must be a function
+    at router.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\router\index.js:392:13)
+    at app.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:222:21)
+    at Array.forEach (<anonymous>)
+    at app.use (C:\Users\Chakor\task-management-system\apps\api\node_modules\express\lib\application.js:219:7)
+    at attachmentsRouter (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:67:5)
+    at Object.<anonymous> (C:\Users\Chakor\task-management-system\apps\api\src\app.ts:87:16)
+    at Module._compile (node:internal/modules/cjs/loader:1871:14)
+    at Object.transformer (C:\Users\Chakor\task-management-system\apps\api\node_modules\tsx\dist\register-C557imBs.cjs:9:3619)
+    at Module.load (node:internal/modules/cjs/loader:1594:32)
+    at Module._load (node:internal/modules/cjs/loader:1396:12)
 
-1:26:20 am [tsx] unlink in ./src\app.ts Restarting...
-
-========================================
- Task Management API
-========================================
- Server:      http://localhost:5000
- Health:      http://localhost:5000/api/health
- Environment: development
-========================================
-
-
-> task-management-api@1.0.0 dev
-> tsx watch src/server.ts
-
-
-========================================
- Task Management API
-========================================
- Server:      http://localhost:5000
- Health:      http://localhost:5000/api/health
- Environment: development
-========================================
-
+Node.js v24.18.0
 ^C
 > task-management-api@1.0.0 dev
 > tsx watch src/server.ts
@@ -73,7 +171,10 @@
  Environment: development
 ========================================
 
-3:53:48 am [tsx] change in ./src\routes\attachments.ts Restarting...
+
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
 
 ========================================
  Task Management API
@@ -83,3 +184,190 @@
  Environment: development
 ========================================
 
+^C^C
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 1 error:
+C:\Users\Chakor\task-management-system\apps\api\src\routes\tasks.ts:74:4: ERROR: Unexpected "return"
+    at failureErrorWithLog (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1752:15)
+    at C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1019:50
+    at responseCallbacks.<computed> (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:886:9)
+    at handleIncomingPacket (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:941:12)
+    at Socket.readFromStdout (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:864:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError'
+}
+
+Node.js v24.18.0
+
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 1 error:
+C:\Users\Chakor\task-management-system\apps\api\src\routes\tasks.ts:74:4: ERROR: Unexpected "return"
+    at failureErrorWithLog (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1752:15)
+    at C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1019:50
+    at responseCallbacks.<computed> (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:886:9)
+    at handleIncomingPacket (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:941:12)
+    at Socket.readFromStdout (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:864:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError'
+}
+
+Node.js v24.18.0
+
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 1 error:
+C:\Users\Chakor\task-management-system\apps\api\src\routes\tasks.ts:74:4: ERROR: Unexpected "return"
+    at failureErrorWithLog (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1752:15)
+    at C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1019:50
+    at responseCallbacks.<computed> (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:886:9)
+    at handleIncomingPacket (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:941:12)
+    at Socket.readFromStdout (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:864:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError'
+}
+
+Node.js v24.18.0
+10:29:35 am [tsx] Return key Rerunning...
+10:29:36 am [tsx] Return key Restarting...
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 1 error:
+C:\Users\Chakor\task-management-system\apps\api\src\routes\tasks.ts:74:4: ERROR: Unexpected "return"
+    at failureErrorWithLog (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1752:15)
+    at C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1019:50
+    at responseCallbacks.<computed> (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:886:9)
+    at handleIncomingPacket (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:941:12)
+    at Socket.readFromStdout (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:864:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError'
+}
+
+Node.js v24.18.0
+10:29:39 am [tsx] Return key Rerunning...
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 1 error:
+C:\Users\Chakor\task-management-system\apps\api\src\routes\tasks.ts:74:4: ERROR: Unexpected "return"
+    at failureErrorWithLog (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1752:15)
+    at C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1019:50
+    at responseCallbacks.<computed> (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:886:9)
+    at handleIncomingPacket (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:941:12)
+    at Socket.readFromStdout (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:864:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError'
+}
+
+Node.js v24.18.0
+^C^C
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 1 error:
+C:\Users\Chakor\task-management-system\apps\api\src\routes\tasks.ts:74:4: ERROR: Unexpected "return"
+    at failureErrorWithLog (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1752:15)
+    at C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1019:50
+    at responseCallbacks.<computed> (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:886:9)
+    at handleIncomingPacket (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:941:12)
+    at Socket.readFromStdout (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:864:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError'
+}
+
+Node.js v24.18.0
+^C
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 1 error:
+C:\Users\Chakor\task-management-system\apps\api\src\routes\tasks.ts:74:4: ERROR: Unexpected "return"
+    at failureErrorWithLog (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1752:15)
+    at C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1019:50
+    at responseCallbacks.<computed> (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:886:9)
+    at handleIncomingPacket (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:941:12)
+    at Socket.readFromStdout (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:864:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError'
+}
+
+Node.js v24.18.0
+^C
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+Error: Transform failed with 1 error:
+C:\Users\Chakor\task-management-system\apps\api\src\routes\tasks.ts:74:4: ERROR: Unexpected "return"
+    at failureErrorWithLog (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1752:15)
+    at C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:1019:50
+    at responseCallbacks.<computed> (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:886:9)
+    at handleIncomingPacket (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:941:12)
+    at Socket.readFromStdout (C:\Users\Chakor\task-management-system\apps\api\node_modules\esbuild\lib\main.js:864:7)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:189:23) {
+  name: 'TransformError'
+}
+
+Node.js v24.18.0

@@ -284,6 +284,7 @@ export default function BoardsPage() {
   }
 
   function handleDragStart(event: DragEvent<HTMLElement>, taskId: number) {
+    if (!permissions.moveTask) return;
     setDraggedTaskId(taskId);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", String(taskId));
@@ -358,7 +359,7 @@ export default function BoardsPage() {
   }
 
   async function createBoard() {
-    if (!permissions.moveTask) return;
+    if (!canManageBoards) return;
 
     const name = window.prompt("Board name:")?.trim();
     if (!name) return;
@@ -382,7 +383,7 @@ export default function BoardsPage() {
   }
 
   async function editBoard(board: Board) {
-    if (!permissions.moveTask) return;
+    if (!canManageBoards) return;
 
     const name = window.prompt("Board name:", board.name)?.trim();
     if (!name) return;
@@ -566,10 +567,12 @@ export default function BoardsPage() {
                   <section
                     key={stage.id}
                     onDragOver={(event) => {
+                      if (!permissions.moveTask) return;
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
                     }}
                     onDrop={(event) => {
+                      if (!permissions.moveTask) return;
                       event.preventDefault();
                       const taskId = draggedTaskId ?? Number(event.dataTransfer.getData("text/plain"));
                       if (taskId) moveTask(taskId, stage.id);
@@ -589,7 +592,7 @@ export default function BoardsPage() {
                       {stageTasks.map((task) => (
                         <article
                           key={task.id}
-                          draggable={true}
+                          draggable={permissions.moveTask}
                           onClick={() => {
                             setSelectedTaskInitialEdit(false);
                             setSelectedTaskId(task.id);
@@ -672,15 +675,6 @@ export default function BoardsPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
 
 
 

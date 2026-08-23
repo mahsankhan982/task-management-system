@@ -25,27 +25,6 @@ import {
 import { apiBlobRequest, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
 
-function AuthImage({ attachmentId, alt, className }: { attachmentId: Id, alt: string, className?: string }) {
-  const [src, setSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    let objectUrl = "";
-    apiBlobRequest(`/attachments/${attachmentId}/content`)
-      .then((blob) => {
-        objectUrl = URL.createObjectURL(blob);
-        setSrc(objectUrl);
-      })
-      .catch(() => setSrc(null));
-    return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [attachmentId]);
-
-  if (!src) return <ImageIcon size={18} />;
-  return <img src={src} alt={alt} className={className} />;
-}
-
-
 type Id = number | string;
 type Priority = "Critical" | "High" | "Medium" | "Low";
 
@@ -176,8 +155,6 @@ export default function RealTaskModal({
   const [attachmentLabel, setAttachmentLabel] = useState("");
   const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [error, setError] = useState("");
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  const [previewImageTitle, setPreviewImageTitle] = useState<string>("");
 
   const loadTask = useCallback(async (syncForm = true) => {
     try {
@@ -559,44 +536,14 @@ export default function RealTaskModal({
 
       const blob = await apiBlobRequest(`/attachments/${attachment.id}/content`);
       const blobUrl = URL.createObjectURL(blob);
-      
-      if (attachment.mime_type?.startsWith("image/")) {
-        setPreviewImageUrl(blobUrl);
-        setPreviewImageTitle(attachment.file_name || attachment.label || "Image");
-      } else {
-        window.open(blobUrl, "_blank", "noopener,noreferrer");
-        window.setTimeout(() => {
-          URL.revokeObjectURL(blobUrl);
-        }, 60000);
-      }
+      window.open(blobUrl, "_blank", "noopener,noreferrer");
+
+      window.setTimeout(() => {
+        URL.revokeObjectURL(blobUrl);
+      }, 60000);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to open attachment",
-      );
-    }
-  }
-
-  async function downloadAttachment(attachment: TaskAttachment) {
-    try {
-      if (attachment.attachment_type === "link" && attachment.url) {
-        window.open(attachment.url, "_blank", "noopener,noreferrer");
-        return;
-      }
-
-      const blob = await apiBlobRequest(`/attachments/${attachment.id}/content`);
-      const blobUrl = URL.createObjectURL(blob);
-      
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = attachment.file_name || "download";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to download attachment",
       );
     }
   }
@@ -1018,15 +965,8 @@ export default function RealTaskModal({
                           key={String(attachment.id)}
                           className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3"
                         >
-                          <div 
-                            className="flex h-10 w-10 shrink-0 overflow-hidden items-center justify-center rounded-lg bg-violet-50 text-violet-700 cursor-pointer"
-                            onClick={() => void openAttachment(attachment)}
-                          >
-                            {isImage ? (
-                              <AuthImage attachmentId={attachment.id} alt={attachment.file_name || "image"} className="h-full w-full object-cover" />
-                            ) : (
-                              <AttachmentIcon size={18} />
-                            )}
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
+                            {isImage ? (<img src={`/api/attachments/${attachment.id}/content`} alt={attachment.file_name || "image"} className="h-10 w-10 rounded-lg object-cover" />) : (<AttachmentIcon size={18} />)}
                           </div>
 
                           <button
@@ -1060,21 +1000,12 @@ export default function RealTaskModal({
                             </p>
                           </button>
 
-                          {attachment.attachment_type === "file" ? (
-                            <button
-                              type="button"
-                              onClick={() => void downloadAttachment(attachment)}
-                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-violet-50 hover:text-violet-700"
-                              title="Download attachment"
-                            >
-                              <Download size={15} />
-                            </button>
-                          ) : null}
-
                           {canDelete ? (
                             <button
                               type="button"
-                              onClick={() => void deleteAttachment(attachment)}
+                              onClick={() =>
+                                void deleteAttachment(attachment)
+                              }
                               disabled={attachmentBusy}
                               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
                               title="Delete attachment"
@@ -1361,43 +1292,9 @@ export default function RealTaskModal({
           </div>
         ) : null}
       </div>
-      
-      {previewImageUrl && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4">
-          <button
-            type="button"
-            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20 hover:text-slate-200"
-            onClick={() => {
-              URL.revokeObjectURL(previewImageUrl);
-              setPreviewImageUrl(null);
-            }}
-          >
-            <X size={24} />
-          </button>
-          <img
-            src={previewImageUrl}
-            alt={previewImageTitle}
-            className="max-h-full max-w-full rounded-lg object-contain"
-          />
-        </div>
-      )}
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

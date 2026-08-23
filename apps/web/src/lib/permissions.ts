@@ -31,7 +31,7 @@ export const rolePermissions = {
     createTask: false,
     assignTask: false,
     editTask: false,
-    moveTask: false,
+    moveTask: true,
     deleteTask: false,
     comment: true,
   },
