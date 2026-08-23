@@ -1,3 +1,7 @@
+import { Router } from "express";
+import { db } from "../db/pool";
+
+const router = Router();
 router.get("/:id", async (req, res) => {
   try {
     const taskResult = await db.query(
@@ -90,3 +94,4 @@ router.get("/:id", async (req, res) => {
     });
   }
 });
+export default router;
