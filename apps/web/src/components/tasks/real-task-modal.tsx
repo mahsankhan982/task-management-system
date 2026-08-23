@@ -965,7 +965,7 @@ export default function RealTaskModal({
                           className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3"
                         >
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
-                            {isImage ? (<img src={`/api/attachments/${attachment.id}/content`} alt={attachment.file_name || "image"} className="h-10 w-10 rounded-lg object-cover" />) : (<AttachmentIcon size={18} />)}
+                            {isImage ? (<img src={`/api/attachments/${attachment.id}/content`} alt={attachment.file_name || "image"} className="h-20 w-20 rounded-lg object-cover cursor-pointer" />) : (<AttachmentIcon size={18} />)}
                           </div>
 
                           <button
@@ -1000,7 +1000,7 @@ export default function RealTaskModal({
                           </button>
 <button
   type="button"
-  type="button" onClick={() => void downloadAttachment(attachment)}
+  onClick={() => void downloadAttachment(attachment)}
   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-violet-50 hover:text-violet-700"
   title="Download attachment"
 >
@@ -1303,6 +1303,15 @@ export default function RealTaskModal({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
 
 
 
