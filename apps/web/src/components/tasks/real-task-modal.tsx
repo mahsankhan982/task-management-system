@@ -327,7 +327,7 @@ export default function RealTaskModal({
   }
 
   async function updateMyTaskStatus(stageName: "In Progress" | "Completed") {
-    if (role !== "Team Member" || !task || !isAssignedToMe) return;
+    if (!task) return;
 
     try {
       setStatusUpdating(true);
@@ -657,7 +657,7 @@ export default function RealTaskModal({
           </div>
 
           <div className="ml-4 flex items-center gap-2">
-            {role === "Team Member" && task && isAssignedToMe ? (
+            {task ? (
               <>
                 {task.stage_name === "Completed" ? (
                   <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
