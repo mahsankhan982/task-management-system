@@ -21,6 +21,28 @@ async function canAddAttachment(taskId: number, userId: number, role: string) {
   return Boolean(assigned.rows[0]);
 }
 
+async function notifyAssignees(taskId: number, uploaderId: number, message: string) {
+  try {
+    const taskResult = await db.query("SELECT title FROM tasks WHERE id = $1 LIMIT 1", [taskId]);
+    const taskTitle = taskResult.rows[0]?.title || "Task";
+    
+    const assignees = await db.query(
+      "SELECT user_id FROM task_assignees WHERE task_id = $1 AND user_id != $2",
+      [taskId, uploaderId]
+    );
+
+    for (const row of assignees.rows) {
+      await db.query(
+        `INSERT INTO notifications (user_id, task_id, type, title, message)
+         VALUES ($1, $2, 'attachment_added', 'New attachment', $3)`,
+        [row.user_id, taskId, `New attachment added to "${taskTitle}": ${message}`]
+      );
+    }
+  } catch (error) {
+    console.error("Notify assignees failed:", error);
+  }
+}
+
 router.get("/", async (req, res) => {
   try {
     const taskId = Number(req.query.task_id);
@@ -121,6 +143,8 @@ router.post(
         ],
       );
 
+      await notifyAssignees(taskId, req.user!.id, fileName);
+
       return res.status(201).json({ success: true, data: result.rows[0] });
     } catch (error: any) {
       if (error?.type === "entity.too.large") {
@@ -188,6 +212,8 @@ router.post("/link", async (req, res) => {
         JSON.stringify({ type: "link", url: parsed.toString(), label }),
       ],
     );
+
+    await notifyAssignees(taskId, req.user!.id, label || parsed.toString());
 
     return res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {

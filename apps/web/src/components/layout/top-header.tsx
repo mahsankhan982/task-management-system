@@ -254,7 +254,7 @@ export default function TopHeader() {
         </button>
 
         {notificationOpen ? (
-          <div className="absolute right-0 top-11 z-[150] w-[360px] max-w-[90vw] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+          <div className="absolute right-0 top-11 z-[150] w-[360px] max-w-[90vw] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between border-b p-4">
               <div>
                 <p className="text-sm font-bold text-slate-900">
