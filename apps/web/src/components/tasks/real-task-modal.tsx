@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity,
   CheckSquare,
+  Download,
   FileText,
   Image as ImageIcon,
   Link2,
@@ -327,7 +328,7 @@ export default function RealTaskModal({
   }
 
   async function updateMyTaskStatus(stageName: "In Progress" | "Completed") {
-    if (!task) return;
+    if (role !== "Team Member" || !task || !isAssignedToMe) return;
 
     try {
       setStatusUpdating(true);
@@ -547,7 +548,30 @@ export default function RealTaskModal({
     }
   }
 
-  async function deleteAttachment(attachment: TaskAttachment) {
+  async function downloadAttachment(attachment: TaskAttachment) {
+  try {
+    if (attachment.attachment_type === "link" && attachment.url) {
+      window.open(attachment.url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    const blob = await apiBlobRequest(/attachments//content);
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = attachment.file_name || "attachment";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    setError(err instanceof Error ? err.message : "Unable to download attachment");
+  }
+}
+async function deleteAttachment(attachment: TaskAttachment) {
     const canDelete =
       role !== "Team Member" ||
       Number(attachment.uploaded_by) === Number(user.id);
@@ -657,7 +681,7 @@ export default function RealTaskModal({
           </div>
 
           <div className="ml-4 flex items-center gap-2">
-            {task ? (
+            {role === "Team Member" && task && isAssignedToMe ? (
               <>
                 {task.stage_name === "Completed" ? (
                   <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
@@ -999,7 +1023,16 @@ export default function RealTaskModal({
                             </p>
                           </button>
 
-                          {canDelete ? (
+'                          <button
+                            type="button"
+                            onClick={() => void downloadAttachment(attachment)}
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-violet-50 hover:text-violet-700"
+                            title="Download attachment"
+                          >
+                            <Download size={15} />
+                          </button>
+
+                          {canDelete ? ('
                             <button
                               type="button"
                               onClick={() =>
@@ -1294,6 +1327,11 @@ export default function RealTaskModal({
     </div>
   );
 }
+
+
+
+
+
 
 
 
