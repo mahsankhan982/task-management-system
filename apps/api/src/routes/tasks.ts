@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db } from "../db/pool";
+import { getBoardName, notifyMake } from '../lib/notifyMake';
 
 const router = Router();
 const allowedPriorities = ["Critical", "High", "Medium", "Low"];
@@ -140,6 +141,20 @@ router.post("/", async (req, res) => {
     );
 
     await client.query("COMMIT");
+
+
+    void getBoardName(task.board_id).then((boardName) =>
+      notifyMake(
+        'task_created',
+        { id: task.id, title: task.title, board_id: task.board_id, board_name: boardName },
+        req.user!.id,
+        {
+          priority: task.priority,
+          due_date: task.due_date,
+          description: task.description,
+        },
+      ),
+    );
     return res.status(201).json({ success: true, data: task });
   } catch (error: any) {
     await client.query("ROLLBACK");
@@ -234,6 +249,20 @@ router.patch("/:id/status", async (req, res) => {
 
     await client.query("COMMIT");
 
+
+    void getBoardName(task.board_id).then((boardName) =>
+      notifyMake(
+        'task_moved',
+        { id: task.id, title: task.title, board_id: task.board_id, board_name: boardName },
+        req.user!.id,
+        {
+          previous_stage_id: task.stage_id,
+          stage_id: stage.id,
+          stage_name: stage.name,
+        },
+      ),
+    );
+
     return res.status(200).json({
       success: true,
       data: {
@@ -264,7 +293,7 @@ router.put("/:id/assignees", async (req, res) => {
     const ids = [...new Set(assignee_ids.map(Number).filter((id: number) => Number.isInteger(id) && id > 0))];
     await client.query("BEGIN");
 
-    const task = await client.query("SELECT id, title FROM tasks WHERE id = $1", [req.params.id]);
+    const task = await client.query("SELECT id, title, board_id FROM tasks WHERE id = $1", [req.params.id]);
     if (!task.rows[0]) {
       await client.query("ROLLBACK");
       return res.status(404).json({ success: false, message: "Task not found" });
@@ -277,6 +306,9 @@ router.put("/:id/assignees", async (req, res) => {
     const previousIds = new Set<number>(
       previousAssignees.rows.map((row) => Number(row.user_id))
     );
+
+
+    const addedIds = ids.filter((userId) => !previousIds.has(userId));
 
     await client.query("DELETE FROM task_assignees WHERE task_id = $1", [req.params.id]);
 
@@ -305,6 +337,19 @@ router.put("/:id/assignees", async (req, res) => {
     );
 
     await client.query("COMMIT");
+
+    const taskInfo = task.rows[0];
+    void getBoardName(taskInfo.board_id).then(async (boardName) => {
+      for (const userId of addedIds) {
+        await notifyMake(
+          'member_added',
+          { id: taskInfo.id, title: taskInfo.title, board_id: taskInfo.board_id, board_name: boardName },
+          req.user!.id,
+          { member_id: userId },
+        );
+      }
+    });
+
     return res.status(200).json({ success: true, assignee_ids: ids });
   } catch (error: any) {
     await client.query("ROLLBACK");
@@ -369,6 +414,17 @@ router.patch("/:id", async (req, res) => {
     }
 
     await client.query("BEGIN");
+    const previousTaskResult = await client.query(
+      'SELECT id, title, board_id, stage_id, description, priority, due_date FROM tasks WHERE id = $1 FOR UPDATE',
+      [req.params.id],
+    );
+    const previousTask = previousTaskResult.rows[0];
+
+    if (!previousTask) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
     const result = await client.query(
       "UPDATE tasks SET title=COALESCE($1,title), description=COALESCE($2,description), priority=COALESCE($3,priority), due_date=COALESCE($4,due_date), stage_id=COALESCE($5,stage_id), board_id=COALESCE($6,board_id), updated_at=NOW() WHERE id=$7 RETURNING *",
       [title ?? null, description ?? null, priority ?? null, due_date ?? null, stage_id ?? null, board_id ?? null, req.params.id]
@@ -385,6 +441,60 @@ router.patch("/:id", async (req, res) => {
     );
 
     await client.query("COMMIT");
+
+ const updatedTask = result.rows[0];
+ void (async () => {
+ try {
+ const boardName = await getBoardName(updatedTask.board_id);
+ const taskRef = {
+ id: updatedTask.id,
+ title: updatedTask.title,
+ board_id: updatedTask.board_id,
+ board_name: boardName,
+ };
+
+ if (description !== undefined && String(previousTask.description ?? '') !== String(updatedTask.description ?? '')) {
+ void notifyMake('description_changed', taskRef, req.user!.id, {
+ previous: previousTask.description,
+ current: updatedTask.description,
+ });
+ }
+
+ if (priority !== undefined && previousTask.priority !== updatedTask.priority) {
+ void notifyMake('priority_changed', taskRef, req.user!.id, {
+ previous: previousTask.priority,
+ current: updatedTask.priority,
+ });
+ }
+
+ if (due_date !== undefined && String(previousTask.due_date ?? '') !== String(updatedTask.due_date ?? '')) {
+ void notifyMake('due_date_changed', taskRef, req.user!.id, {
+ previous: previousTask.due_date,
+ current: updatedTask.due_date,
+ });
+ }
+
+ if (Number(previousTask.stage_id) !== Number(updatedTask.stage_id) || Number(previousTask.board_id) !== Number(updatedTask.board_id)) {
+ const previousBoardName = await getBoardName(previousTask.board_id);
+ void notifyMake(
+ 'task_moved',
+ {
+ ...taskRef,
+ previous_board_id: previousTask.board_id,
+ previous_board_name: previousBoardName,
+ },
+ req.user!.id,
+ {
+ previous_stage_id: previousTask.stage_id,
+ stage_id: updatedTask.stage_id,
+ },
+ );
+ }
+ } catch (makeError) {
+ console.error('Task Make notification failed:', makeError);
+ }
+ })();
+
     return res.status(200).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
     await client.query("ROLLBACK");
@@ -402,7 +512,7 @@ router.delete("/:id", async (req, res) => {
   const client = await db.connect();
   try {
     await client.query("BEGIN");
-    const task = await client.query("SELECT id, title FROM tasks WHERE id = $1", [req.params.id]);
+    const task = await client.query("SELECT id, title, board_id FROM tasks WHERE id = $1", [req.params.id]);
 
     if (!task.rows[0]) {
       await client.query("ROLLBACK");
@@ -427,3 +537,4 @@ router.delete("/:id", async (req, res) => {
 });
 
 export default router;
+

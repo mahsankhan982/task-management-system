@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db } from "../db/pool";
+import { getBoardName, notifyMake } from '../lib/notifyMake';
 
 const router = Router();
 
@@ -46,7 +47,7 @@ router.post("/", async (req, res) => {
     await client.query("BEGIN");
 
     const taskResult = await client.query(
-      "SELECT id, title FROM tasks WHERE id = $1",
+      "SELECT id, title, board_id FROM tasks WHERE id = $1",
       [task_id]
     );
 
@@ -87,6 +88,16 @@ router.post("/", async (req, res) => {
 
     await client.query("COMMIT");
 
+    const task = taskResult.rows[0];
+    void getBoardName(task.board_id).then((boardName) =>
+      notifyMake(
+        'comment_added',
+        { id: task.id, title: task.title, board_id: task.board_id, board_name: boardName },
+        req.user!.id,
+        { comment: body.trim() },
+      ),
+    );
+
     return res.status(201).json({
       success: true,
       data: result.rows[0],
@@ -113,3 +124,4 @@ router.post("/", async (req, res) => {
 });
 
 export default router;
+

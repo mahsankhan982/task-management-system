@@ -1,5 +1,6 @@
 import express, { Router } from "express";
 import { db } from "../db/pool";
+import { getBoardName, notifyMake } from '../lib/notifyMake';
 
 const router = Router();
 const MAX_FILE_BYTES = 3 * 1024 * 1024;
@@ -145,6 +146,22 @@ router.post(
 
       await notifyAssignees(taskId, req.user!.id, fileName);
 
+      void (async () => {
+        const taskRow = await db.query('SELECT title, board_id FROM tasks WHERE id = $1', [taskId]);
+        const t = taskRow.rows[0];
+        if (!t) return;
+        const boardName = await getBoardName(t.board_id);
+        void notifyMake(
+          'file_attached',
+          { id: taskId, title: t.title, board_id: t.board_id, board_name: boardName },
+          req.user!.id,
+          {
+            file_name: fileName,
+            file_url: `${req.protocol}://${req.get('host')}/api/attachments/${result.rows[0].id}/content`,
+          },
+        );
+      })();
+
       return res.status(201).json({ success: true, data: result.rows[0] });
     } catch (error: any) {
       if (error?.type === "entity.too.large") {
@@ -214,6 +231,22 @@ router.post("/link", async (req, res) => {
     );
 
     await notifyAssignees(taskId, req.user!.id, label || parsed.toString());
+
+    void (async () => {
+      const taskRow = await db.query('SELECT title, board_id FROM tasks WHERE id = $1', [taskId]);
+      const t = taskRow.rows[0];
+      if (!t) return;
+      const boardName = await getBoardName(t.board_id);
+      void notifyMake(
+        'file_attached',
+        { id: taskId, title: t.title, board_id: t.board_id, board_name: boardName },
+        req.user!.id,
+        {
+          file_name: label || undefined,
+          file_url: parsed.toString(),
+        },
+      );
+    })();
 
     return res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error) {
