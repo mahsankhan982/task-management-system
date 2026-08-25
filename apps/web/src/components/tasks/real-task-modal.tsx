@@ -1102,26 +1102,44 @@ export default function RealTaskModal({
                       Assign Employee
                     </label>
 
-                    <select
-                      multiple
-                      size={6}
-                      value={assigneeIds}
-                      onChange={(event) =>
-                        setAssigneeIds(Array.from(event.target.selectedOptions, (option) => option.value))
-                      }
-                      disabled={!editing || !permissions.assignTask}
-                      className="mt-2 min-h-[180px] py-2 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 disabled:bg-slate-50"
-                    >
-                      <option value="">Unassigned</option>
-                      {users.map((user) => (
-                        <option key={String(user.id)} value={String(user.id)}>
-                          {user.full_name} — {user.email} — {user.role}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="mt-2 max-h-[260px] overflow-y-auto rounded-xl border border-slate-300 bg-white">
+                      {users.map((user) => {
+                        const userId = String(user.id);
+                        const checked = assigneeIds.includes(userId);
+
+                        return (
+                          <label
+                            key={userId}
+                            className="flex cursor-pointer items-center gap-3 border-b px-3 py-2.5 text-sm last:border-b-0 hover:bg-slate-50"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={!editing || !permissions.assignTask}
+                              onChange={() =>
+                                setAssigneeIds((current) =>
+                                  checked
+                                    ? current.filter((id) => id !== userId)
+                                    : [...current, userId],
+                                )
+                              }
+                              className="h-4 w-4 shrink-0 rounded border-slate-300 accent-violet-700"
+                            />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-medium text-slate-800">
+                                {user.full_name}
+                              </span>
+                              <span className="block truncate text-xs text-slate-500">
+                                {user.email} - {user.role}
+                              </span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
 
                     <p className="mt-2 text-xs text-slate-500">
-                      Select multiple employees to assign this task. Hold Ctrl while clicking to select or remove employees.
+                      Tick one or more employees, then click Save.
                     </p>
                   </div>
                 ) : (
