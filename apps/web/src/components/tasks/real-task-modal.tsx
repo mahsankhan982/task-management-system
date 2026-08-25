@@ -1103,12 +1103,14 @@ export default function RealTaskModal({
                     </label>
 
                     <select
-                      value={assigneeIds[0] ?? ""}
+                      multiple
+                      size={6}
+                      value={assigneeIds}
                       onChange={(event) =>
-                        setAssigneeIds(event.target.value ? [event.target.value] : [])
+                        setAssigneeIds(Array.from(event.target.selectedOptions, (option) => option.value))
                       }
                       disabled={!editing || !permissions.assignTask}
-                      className="mt-2 h-12 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 disabled:bg-slate-50"
+                      className="mt-2 min-h-[180px] py-2 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-100 disabled:bg-slate-50"
                     >
                       <option value="">Unassigned</option>
                       {users.map((user) => (
@@ -1119,7 +1121,7 @@ export default function RealTaskModal({
                     </select>
 
                     <p className="mt-2 text-xs text-slate-500">
-                      Select one employee to assign this task.
+                      Select multiple employees to assign this task. Hold Ctrl while clicking to select or remove employees.
                     </p>
                   </div>
                 ) : (
@@ -1384,6 +1386,8 @@ export default function RealTaskModal({
     </div>
   );
 }
+
+
 
 
 
