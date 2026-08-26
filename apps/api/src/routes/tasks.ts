@@ -253,12 +253,15 @@ router.patch("/:id/status", async (req, res) => {
         });
       }
     }
+    const stageLookupNames = stage_name === "Waiting for Review" ? ["Waiting for Review", "Review", "Waiting for Lead"] : [stage_name];
+
     const stageResult = await client.query(
       `SELECT id, name
        FROM workflow_stages
-       WHERE board_id = $1 AND name = $2
+       WHERE board_id = $1 AND name = ANY($2::text[])
+       ORDER BY CASE WHEN name = $3 THEN 0 ELSE 1 END
        LIMIT 1`,
-      [task.board_id, stage_name],
+      [task.board_id, stageLookupNames, stage_name],
     );
 
     const stage = stageResult.rows[0];

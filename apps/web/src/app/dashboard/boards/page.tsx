@@ -187,10 +187,11 @@ export default function BoardsPage() {
     const inProgress = byName("In Progress");
     const waiting = byName("Waiting for Review");
     const review = byName("Review");
+    const waitingForLead = byName("Waiting for Lead");
     const completed = byName("Completed");
 
     const coreIds = new Set(
-      [toDo, inProgress, waiting, review, completed]
+      [toDo, inProgress, waiting, review, waitingForLead, completed]
         .filter(Boolean)
         .map((stage) => Number(stage!.id)),
     );
@@ -218,11 +219,11 @@ export default function BoardsPage() {
             stageIds: [Number(inProgress.id)],
           }
         : null,
-      waiting || review
+      waiting || review || waitingForLead
         ? {
-            id: Number((waiting ?? review)!.id),
+            id: Number((waiting ?? review ?? waitingForLead)!.id),
             name: "Waiting for Review",
-            stageIds: [waiting?.id, review?.id]
+            stageIds: [waiting?.id, review?.id, waitingForLead?.id]
               .filter((id): id is number => typeof id === "number")
               .map(Number),
           }
@@ -260,22 +261,23 @@ export default function BoardsPage() {
     const task = tasks.find((item) => item.id === taskId);
     const targetStage = boardWorkflow.find((stage) => stage.id === stageId);
     if (!task || !targetStage) return;
+    const targetStageName = ["Review", "Waiting for Lead"].includes(targetStage.name) ? "Waiting for Review" : targetStage.name;
 
     if (role === "Team Member") {
       const assignedToMe = task.assignees?.some((a) => Number(a.id) === Number(user.id));
       if (!assignedToMe) { setError("You can only move tasks assigned to you"); return; }
       const allowedNextStage: Record<string, string> = { "To Do": "In Progress", "In Progress": "Waiting for Review", "Waiting for Review": "Completed" };
-      if (allowedNextStage[task.stage_name] !== targetStage.name) {
+      if (allowedNextStage[task.stage_name] !== targetStageName) {
         setError("Team Members must follow: To Do -> In Progress -> Waiting for Review -> Completed");
         return;
       }
     } else if (!permissions.moveTask) return;
 
     const previous = tasks;
-    setTasks((current) => current.map((item) => item.id === taskId ? { ...item, stage_id: stageId, stage_name: targetStage.name } : item));
+    setTasks((current) => current.map((item) => item.id === taskId ? { ...item, stage_id: stageId, stage_name: targetStageName } : item));
     try {
       if (role === "Team Member") {
-        await apiRequest(`/tasks/${taskId}/status`, { method: "PATCH", body: JSON.stringify({ stage_name: targetStage.name }) });
+        await apiRequest(`/tasks/${taskId}/status`, { method: "PATCH", body: JSON.stringify({ stage_name: targetStageName }) });
       } else {
         await apiRequest(`/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ stage_id: stageId }) });
       }
