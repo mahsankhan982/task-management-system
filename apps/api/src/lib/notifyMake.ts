@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 
 import { env } from "../config/env";
 import { db } from "../db/pool";
+import { notifySlack } from "./notifySlack";
 
 export type MakeEvent =
   | "task_created"
@@ -47,6 +48,8 @@ export async function notifyMake(
   userId: number,
   data: Record<string, unknown> = {},
 ): Promise<void> {
+  void notifySlack(event, task, userId, data);
+
   if (!env.MAKE_WEBHOOK_URL) {
     return;
   }
