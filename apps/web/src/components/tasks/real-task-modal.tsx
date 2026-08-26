@@ -1392,7 +1392,51 @@ export default function RealTaskModal({
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-2 text-sm text-slate-700">{entry.body}</p>
+                      {editingCommentId === entry.id ? (
+                        <div className="mt-2 space-y-2">
+                          <textarea
+                            value={editingCommentBody}
+                            onChange={(e) => setEditingCommentBody(e.target.value)}
+                            className="w-full rounded-lg border p-2 text-sm"
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => saveEditComment(entry.id)}
+                            className="text-xs font-semibold text-green-600"
+                          >
+                            Save
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCommentId(null);
+                              setEditingCommentBody("");
+                            }}
+                            className="ml-3 text-xs font-semibold text-red-600"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="mt-2 text-sm text-slate-700">{entry.body}</p>
+
+                          {Number(entry.user_id) === Number(user.id) ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingCommentId(entry.id);
+                                setEditingCommentBody(entry.body);
+                              }}
+                              className="mt-2 text-xs font-semibold text-blue-600 hover:underline"
+                            >
+                              Edit
+                            </button>
+                          ) : null}
+                        </>
+                      )}
                       <p className="mt-2 text-[11px] text-slate-400">
                         {formatDate(entry.created_at)}
                       </p>
