@@ -1423,7 +1423,7 @@ export default function RealTaskModal({
                         <>
                           <p className="mt-2 text-sm text-slate-700">{entry.body}</p>
 
-                          {Number(entry.user_id) === Number(user.id) ? (
+                          {entry.user_name === user.full_name ? (
                             <button
                               type="button"
                               onClick={() => {
