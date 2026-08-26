@@ -51,6 +51,7 @@ type Task = {
   due_date: string | null;
   board_name: string;
   stage_name: string;
+  assignees: Array<{ id: number; full_name: string }>;
 };
 
 const stageIcons = {
@@ -72,7 +73,7 @@ export default function BoardsPage() {
   const searchParams = useSearchParams();
   const requestedBoardId = Number(searchParams.get("boardId"));
 
-  const { permissions, role } = useRole();
+  const { permissions, role, user } = useRole();
   const canManageBoards = role !== "Team Member";
   const [boards, setBoards] = useState<Board[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -256,42 +257,45 @@ export default function BoardsPage() {
   }, [tasks, selectedBoardId, query]);
 
   async function moveTask(taskId: number, stageId: number) {
-    if (role === "Team Member" || !permissions.moveTask) return;
+    const task = tasks.find((item) => item.id === taskId);
+    const targetStage = boardWorkflow.find((stage) => stage.id === stageId);
+    if (!task || !targetStage) return;
+
+    if (role === "Team Member") {
+      const assignedToMe = task.assignees?.some((a) => Number(a.id) === Number(user.id));
+      if (!assignedToMe) { setError("You can only move tasks assigned to you"); return; }
+      const allowedNextStage: Record<string, string> = { "To Do": "In Progress", "In Progress": "Waiting for Review", "Waiting for Review": "Completed" };
+      if (allowedNextStage[task.stage_name] !== targetStage.name) {
+        setError("Team Members must follow: To Do -> In Progress -> Waiting for Review -> Completed");
+        return;
+      }
+    } else if (!permissions.moveTask) return;
 
     const previous = tasks;
-    setTasks((current) =>
-      current.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              stage_id: stageId,
-              stage_name: boardWorkflow.find((stage) => stage.id === stageId)?.name ?? task.stage_name,
-            }
-          : task,
-      ),
-    );
-
+    setTasks((current) => current.map((item) => item.id === taskId ? { ...item, stage_id: stageId, stage_name: targetStage.name } : item));
     try {
-      await apiRequest(`/tasks/${taskId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ stage_id: stageId }),
-      });
+      if (role === "Team Member") {
+        await apiRequest(`/tasks/${taskId}/status`, { method: "PATCH", body: JSON.stringify({ stage_name: targetStage.name }) });
+      } else {
+        await apiRequest(`/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ stage_id: stageId }) });
+      }
+      setError("");
     } catch (err) {
       setTasks(previous);
       setError(err instanceof Error ? err.message : "Unable to move task");
     }
   }
-
   function handleDragStart(event: DragEvent<HTMLElement>, taskId: number) {
-    if (role === "Team Member" || !permissions.moveTask) {
-      event.preventDefault();
-      return;
-    }
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) { event.preventDefault(); return; }
+    if (role === "Team Member") {
+      const assignedToMe = task.assignees?.some((a) => Number(a.id) === Number(user.id));
+      if (!assignedToMe) { event.preventDefault(); return; }
+    } else if (!permissions.moveTask) { event.preventDefault(); return; }
     setDraggedTaskId(taskId);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", String(taskId));
   }
-
   async function handleCreateTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedBoardId || !permissions.createTask) return;
@@ -578,12 +582,12 @@ export default function BoardsPage() {
                   <section
                     key={stage.id}
                     onDragOver={(event) => {
-                      if (role === "Team Member" || !permissions.moveTask) return;
+                      if (role !== "Team Member" && !permissions.moveTask) return;
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
                     }}
                     onDrop={(event) => {
-                      if (role === "Team Member" || !permissions.moveTask) return;
+                      if (role !== "Team Member" && !permissions.moveTask) return;
                       event.preventDefault();
                       const taskId = draggedTaskId ?? Number(event.dataTransfer.getData("text/plain"));
                       if (taskId) moveTask(taskId, stage.id);
@@ -603,7 +607,7 @@ export default function BoardsPage() {
                       {stageTasks.map((task) => (
                         <article
                           key={task.id}
-                          draggable={role !== "Team Member" && permissions.moveTask}
+                          draggable={role === "Team Member" ? Boolean(task.assignees?.some((a) => Number(a.id) === Number(user.id))) : permissions.moveTask}
                           onClick={() => {
                             setSelectedTaskInitialEdit(false);
                             setSelectedTaskId(task.id);
