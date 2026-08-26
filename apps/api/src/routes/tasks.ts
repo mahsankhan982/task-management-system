@@ -181,17 +181,17 @@ router.patch("/:id/status", async (req, res) => {
 
     const { stage_name } = req.body;
 
-    if (!["In Progress", "Completed"].includes(stage_name)) {
+    if (!["In Progress", "Waiting for Lead", "Completed"].includes(stage_name)) {
       return res.status(400).json({
         success: false,
-        message: "Team Members can only set assigned tasks to In Progress or Completed",
+        message: "Team Members can only move assigned tasks through In Progress, Waiting for Lead, and Completed",
       });
     }
 
     await client.query("BEGIN");
 
     const taskResult = await client.query(
-      `SELECT t.id, t.board_id, t.stage_id, t.title
+      `SELECT t.id, t.board_id, t.stage_id, t.title, t.updated_at
        FROM tasks t
        JOIN task_assignees ta ON ta.task_id = t.id
        WHERE t.id = $1 AND ta.user_id = $2
@@ -210,6 +210,49 @@ router.patch("/:id/status", async (req, res) => {
       });
     }
 
+    const currentStageResult = await client.query(
+      "SELECT name FROM workflow_stages WHERE id = $1 LIMIT 1",
+      [task.stage_id],
+    );
+    const currentStageName = currentStageResult.rows[0]?.name ?? "";
+
+    const allowedTransitions: Record<string, string[]> = {
+      "To Do": ["In Progress"],
+      "In Progress": ["Waiting for Lead"],
+      "Waiting for Lead": ["Completed"],
+    };
+
+    const allowedNextStages = allowedTransitions[currentStageName] ?? [];
+
+    if (!allowedNextStages.includes(stage_name)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        message: "Task must follow: To Do -> In Progress -> Waiting for Lead -> Completed",
+      });
+    }
+
+    if (stage_name === "Completed") {
+      const leadReply = await client.query(
+        `SELECT c.id
+         FROM comments c
+         JOIN users u ON u.id = c.user_id
+         WHERE c.task_id = $1
+           AND u.role = 'Team Lead'
+           AND c.created_at >= $2
+         ORDER BY c.created_at DESC
+         LIMIT 1`,
+        [task.id, task.updated_at],
+      );
+
+      if (!leadReply.rows[0]) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          success: false,
+          message: "A Team Lead must reply after the task enters Waiting for Lead before it can be completed",
+        });
+      }
+    }
     const stageResult = await client.query(
       `SELECT id, name
        FROM workflow_stages
