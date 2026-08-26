@@ -1,0 +1,1 @@
+UPDATE workflow_stages SET name = 'Waiting for Review' WHERE name = 'Waiting for Lead';

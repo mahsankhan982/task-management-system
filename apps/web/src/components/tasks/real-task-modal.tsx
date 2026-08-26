@@ -79,6 +79,7 @@ type TaskComment = {
   user_role?: string | null;
   body: string;
   created_at: string;
+  updated_at: string;
 };
 
 type ActivityEntry = {
@@ -126,7 +127,7 @@ type Props = {
 };
 
 const priorities: Priority[] = ["Critical", "High", "Medium", "Low"];
-const modalCoreStageNames = ["To Do", "In Progress", "Waiting for Lead", "Review", "Completed"] as const;
+const modalCoreStageNames = ["To Do", "In Progress", "Waiting for Review", "Review", "Completed"] as const;
 
 function formatDate(value: string | null) {
   if (!value) return "Not set";
@@ -178,6 +179,8 @@ export default function RealTaskModal({
   const [error, setError] = useState("");
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [previewImageTitle, setPreviewImageTitle] = useState<string>("");
+  const [editingCommentId, setEditingCommentId] = useState<Id | null>(null);
+  const [editingCommentBody, setEditingCommentBody] = useState("");
 
   const loadTask = useCallback(async (syncForm = true) => {
     try {
@@ -350,7 +353,7 @@ export default function RealTaskModal({
     }
   }
 
-  async function updateMyTaskStatus(stageName: "In Progress" | "Completed") {
+  async function updateMyTaskStatus(stageName: "In Progress" | "Waiting for Review" | "Completed") {
     if (role !== "Team Member" || !task || !isAssignedToMe) return;
 
     try {
@@ -690,6 +693,28 @@ export default function RealTaskModal({
     }
   }
 
+  async function saveEditComment(commentId: Id) {
+    const body = editingCommentBody.trim();
+    if (!body) return;
+
+    try {
+      setPosting(true);
+      setError("");
+      await apiRequest(`/comments/${commentId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ body }),
+      });
+      setEditingCommentId(null);
+      setEditingCommentBody("");
+      await loadTask(false);
+      await onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to edit comment");
+    } finally {
+      setPosting(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
       <button
@@ -717,7 +742,7 @@ export default function RealTaskModal({
                   <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
                     Completed
                   </span>
-                ) : task.stage_name === "In Progress" ? (
+                ) : task.stage_name === "Waiting for Review" ? (
                   <button
                     type="button"
                     onClick={() => void updateMyTaskStatus("Completed")}
@@ -731,12 +756,26 @@ export default function RealTaskModal({
                     )}
                     {statusUpdating ? "Updating..." : "Mark Complete"}
                   </button>
-                ) : (
+                ) : task.stage_name === "In Progress" ? (
+                  <button
+                    type="button"
+                    onClick={() => void updateMyTaskStatus("Waiting for Review")}
+                    disabled={statusUpdating}
+                    className="flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                  >
+                    {statusUpdating ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <MessageSquare size={15} />
+                    )}
+                    {statusUpdating ? "Updating..." : "Send for Review"}
+                  </button>
+                ) : task.stage_name === "To Do" ? (
                   <button
                     type="button"
                     onClick={() => void updateMyTaskStatus("In Progress")}
                     disabled={statusUpdating}
-                    className="flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                    className="flex h-9 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
                   >
                     {statusUpdating ? (
                       <Loader2 size={15} className="animate-spin" />
@@ -745,7 +784,7 @@ export default function RealTaskModal({
                     )}
                     {statusUpdating ? "Updating..." : "Start Work"}
                   </button>
-                )}
+                ) : null}
               </>
             ) : null}
 
@@ -828,9 +867,18 @@ export default function RealTaskModal({
           <div className="grid lg:grid-cols-[1.25fr_.75fr]">
             <section className="p-6">
               {error ? (
-                <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  {error}
-                </div>
+                error.includes("Team Members have read-only access") ? (
+                  <div className="mb-5 flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3.5 text-sm font-medium text-violet-800 shadow-sm">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+                      i
+                    </span>
+                    {error}
+                  </div>
+                ) : (
+                  <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )
               ) : null}
 
               <div>
@@ -1045,7 +1093,7 @@ export default function RealTaskModal({
                               {attachment.attachment_type === "file"
                                 ? `${attachment.mime_type || "File"}${
                                     attachment.file_size
-                                      ? ` Â· ${Math.max(
+                                      ? ` Ã‚Â· ${Math.max(
                                           1,
                                           Math.round(
                                             Number(attachment.file_size) / 1024,
@@ -1055,7 +1103,7 @@ export default function RealTaskModal({
                                   }`
                                 : attachment.url}
                               {attachment.uploader_name
-                                ? ` Â· Added by ${attachment.uploader_name}`
+                                ? ` Ã‚Â· Added by ${attachment.uploader_name}`
                                 : ""}
                             </p>
                           </button>

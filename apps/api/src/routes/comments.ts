@@ -123,5 +123,44 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.patch("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { body } = req.body;
+
+    if (!body || typeof body !== "string" || !body.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Comment body is required",
+      });
+    }
+
+    const commentResult = await db.query("SELECT * FROM comments WHERE id = $1", [id]);
+    const comment = commentResult.rows[0];
+
+    if (!comment) {
+      return res.status(404).json({ success: false, message: "Comment not found" });
+    }
+
+    if (
+      comment.user_id !== req.user!.id &&
+      req.user!.role !== "Manager" &&
+      req.user!.role !== "Coordinator"
+    ) {
+      return res.status(403).json({ success: false, message: "Not authorized to edit this comment" });
+    }
+
+    const result = await db.query(
+      "UPDATE comments SET body = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
+      [body.trim(), id]
+    );
+
+    return res.status(200).json({ success: true, data: result.rows[0] });
+  } catch (error) {
+    console.error("Edit comment failed:", error);
+    return res.status(500).json({ success: false, message: "Unable to edit comment" });
+  }
+});
+
 export default router;
 

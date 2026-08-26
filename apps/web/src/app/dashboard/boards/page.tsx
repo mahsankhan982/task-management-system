@@ -56,7 +56,6 @@ type Task = {
 const stageIcons = {
   "To Do": CircleDot,
   "In Progress": Clock3,
-  "Waiting for Lead": UserRound,
   "Waiting for Review": MessageSquare,
   Review: MessageSquare,
   Completed: CheckCircle2,
@@ -185,7 +184,7 @@ export default function BoardsPage() {
 
     const toDo = byName("To Do");
     const inProgress = byName("In Progress");
-    const waiting = byName("Waiting for Lead");
+    const waiting = byName("Waiting for Review");
     const review = byName("Review");
     const completed = byName("Completed");
 
@@ -494,9 +493,18 @@ export default function BoardsPage() {
 
 
         {error ? (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
+          error.includes("Team Members have read-only access") ? (
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3.5 text-sm font-medium text-violet-800 shadow-sm">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+                i
+              </span>
+              {error}
+            </div>
+          ) : (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          )
         ) : null}
 
         {showCreate && permissions.createTask ? (

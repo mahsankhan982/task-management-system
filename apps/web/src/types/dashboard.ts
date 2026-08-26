@@ -24,7 +24,7 @@ export interface DashboardTask {
   status:
     | "To Do"
     | "In Progress"
-    | "Waiting for Lead"
+    | "Waiting for Review"
     | "Review"
     | "Completed";
 }

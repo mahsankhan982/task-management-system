@@ -181,10 +181,10 @@ router.patch("/:id/status", async (req, res) => {
 
     const { stage_name } = req.body;
 
-    if (!["In Progress", "Waiting for Lead", "Completed"].includes(stage_name)) {
+    if (!["In Progress", "Waiting for Review", "Completed"].includes(stage_name)) {
       return res.status(400).json({
         success: false,
-        message: "Team Members can only move assigned tasks through In Progress, Waiting for Lead, and Completed",
+        message: "Team Members can only move assigned tasks through In Progress, Waiting for Review, and Completed",
       });
     }
 
@@ -218,8 +218,8 @@ router.patch("/:id/status", async (req, res) => {
 
     const allowedTransitions: Record<string, string[]> = {
       "To Do": ["In Progress"],
-      "In Progress": ["Waiting for Lead"],
-      "Waiting for Lead": ["Completed"],
+      "In Progress": ["Waiting for Review"],
+      "Waiting for Review": ["Completed"],
     };
 
     const allowedNextStages = allowedTransitions[currentStageName] ?? [];
@@ -228,7 +228,7 @@ router.patch("/:id/status", async (req, res) => {
       await client.query("ROLLBACK");
       return res.status(400).json({
         success: false,
-        message: "Task must follow: To Do -> In Progress -> Waiting for Lead -> Completed",
+        message: "Task must follow: To Do -> In Progress -> Waiting for Review -> Completed",
       });
     }
 
@@ -249,7 +249,7 @@ router.patch("/:id/status", async (req, res) => {
         await client.query("ROLLBACK");
         return res.status(400).json({
           success: false,
-          message: "A Team Lead must reply after the task enters Waiting for Lead before it can be completed",
+          message: "A Team Lead must reply after the task enters Waiting for Review before it can be completed",
         });
       }
     }

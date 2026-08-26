@@ -19,7 +19,7 @@ export const dashboardStats: DashboardStat[] = [
   },
   {
     id: 3,
-    label: "Waiting for Lead",
+    label: "Waiting for Review",
     value: 4,
     change: "Awaiting review",
   },
@@ -77,7 +77,7 @@ export const recentTasks: DashboardTask[] = [
     board: "Graphic Design",
     priority: "Critical",
     dueDate: "12 Aug",
-    status: "Waiting for Lead",
+    status: "Waiting for Review",
   },
   {
     id: 3,

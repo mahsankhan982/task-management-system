@@ -6,9 +6,8 @@ const router = Router();
 const defaultWorkflow = [
   ["To Do", 1],
   ["In Progress", 2],
-  ["Waiting for Lead", 3],
-  ["Review", 4],
-  ["Completed", 5],
+  ["Waiting for Review", 3],
+  ["Completed", 4],
 ] as const;
 
 router.get("/", async (_req, res) => {
@@ -134,3 +133,4 @@ router.delete("/:id", async (req, res) => {
 });
 
 export default router;
+

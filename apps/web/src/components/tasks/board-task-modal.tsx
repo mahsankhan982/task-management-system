@@ -3,12 +3,12 @@ import { CheckSquare, MessageSquare, X } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { useRole } from "@/contexts/role-context";
 
-export type BoardStage="To Do"|"In Progress"|"Waiting for Lead"|"Review"|"Completed";
+export type BoardStage="To Do"|"In Progress"|"Waiting for Review"|"Review"|"Completed";
 export type BoardPriority="Critical"|"High"|"Medium"|"Low";
 export type BoardTaskData={id:number;title:string;team:string;priority:BoardPriority;due:string;assignee:string;comments:number};
 
 type Props={task:BoardTaskData;stage:BoardStage;onClose:()=>void;onSave:(task:BoardTaskData,stage:BoardStage)=>void};
-const stages:BoardStage[]=["To Do","In Progress","Waiting for Lead","Review","Completed"];
+const stages:BoardStage[]=["To Do","In Progress","Waiting for Review","Review","Completed"];
 const priorities:BoardPriority[]=["Critical","High","Medium","Low"];
 const members=["MK","AK","UR","SA","HS","HM","MA","FA"];
 
