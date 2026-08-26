@@ -256,7 +256,7 @@ export default function BoardsPage() {
   }, [tasks, selectedBoardId, query]);
 
   async function moveTask(taskId: number, stageId: number) {
-    if (!permissions.moveTask) return;
+    if (role === "Team Member" || !permissions.moveTask) return;
 
     const previous = tasks;
     setTasks((current) =>
@@ -283,6 +283,10 @@ export default function BoardsPage() {
   }
 
   function handleDragStart(event: DragEvent<HTMLElement>, taskId: number) {
+    if (role === "Team Member" || !permissions.moveTask) {
+      event.preventDefault();
+      return;
+    }
     setDraggedTaskId(taskId);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", String(taskId));
@@ -574,10 +578,12 @@ export default function BoardsPage() {
                   <section
                     key={stage.id}
                     onDragOver={(event) => {
+                      if (role === "Team Member" || !permissions.moveTask) return;
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
                     }}
                     onDrop={(event) => {
+                      if (role === "Team Member" || !permissions.moveTask) return;
                       event.preventDefault();
                       const taskId = draggedTaskId ?? Number(event.dataTransfer.getData("text/plain"));
                       if (taskId) moveTask(taskId, stage.id);
@@ -597,7 +603,7 @@ export default function BoardsPage() {
                       {stageTasks.map((task) => (
                         <article
                           key={task.id}
-                          draggable={true}
+                          draggable={role !== "Team Member" && permissions.moveTask}
                           onClick={() => {
                             setSelectedTaskInitialEdit(false);
                             setSelectedTaskId(task.id);
