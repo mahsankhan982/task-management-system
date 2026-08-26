@@ -49,6 +49,7 @@ export async function notifyMake(
   data: Record<string, unknown> = {},
 ): Promise<void> {
   void notifySlack(event, task, userId, data);
+  return; // Make.com webhook disabled
 
   if (!env.MAKE_WEBHOOK_URL) {
     return;
