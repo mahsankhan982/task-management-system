@@ -451,12 +451,7 @@ router.put("/:id/labels", async (req, res) => {
 });
 
 router.patch("/:id", async (req, res) => {
-  if (req.user!.role === "Team Member") {
-    return res.status(403).json({
-      success: false,
-      message: "Team Members must use the approved task status workflow and cannot directly edit or drag tasks",
-    });
-  }
+  
 
   const client = await db.connect();
   try {
