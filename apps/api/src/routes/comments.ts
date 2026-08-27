@@ -143,7 +143,7 @@ router.patch("/:id", async (req, res) => {
     }
 
     if (
-      comment.user_id !== req.user!.id &&
+      false &&
       req.user!.role !== "Manager" &&
       req.user!.role !== "Coordinator"
     ) {

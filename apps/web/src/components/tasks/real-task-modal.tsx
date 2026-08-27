@@ -1459,7 +1459,7 @@ export default function RealTaskModal({
                       <div key={String(entry.id)} className="rounded-xl border bg-white p-3">
                         <p className="text-sm text-slate-700">
                           <span className="font-semibold">{entry.user_name || "System"}</span>{" "}
-                          {entry.action.replaceAll("_", " ")}
+                          {entry.action === "task_updated" && entry.details?.assignees ? `assigned task to ${entry.details.assignees}` : entry.action.replaceAll("_", " ")}
                         </p>
                         <p className="mt-1 text-[11px] text-slate-400">
                           {formatDate(entry.created_at)}

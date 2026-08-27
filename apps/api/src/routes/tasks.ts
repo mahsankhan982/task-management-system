@@ -490,7 +490,7 @@ router.patch("/:id", async (req, res) => {
 
     await client.query(
       "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
-      [req.params.id, req.user!.id, "task_updated", JSON.stringify({ title, description, priority, due_date, stage_id, board_id })]
+      [req.params.id, req.user!.id, "task_updated", JSON.stringify({ title, description, priority, due_date, stage_id, board_id, assignees })]
     );
 
     await client.query("COMMIT");

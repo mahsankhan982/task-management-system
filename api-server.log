@@ -371,3 +371,63 @@ C:\Users\Chakor\task-management-system\apps\api\src\routes\tasks.ts:74:4: ERROR:
 }
 
 Node.js v24.18.0
+
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+
+> task-management-api@1.0.0 dev
+> tsx watch src/server.ts
+
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+9:28:41 pm [tsx] change in ./src\routes\comments.ts Restarting...
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+9:53:35 pm [tsx] change in ./src\routes\tasks.ts Restarting...
+
+========================================
+ Task Management API
+========================================
+ Server:      http://localhost:5000
+ Health:      http://localhost:5000/api/health
+ Environment: development
+========================================
+
+^C^C
