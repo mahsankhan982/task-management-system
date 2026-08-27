@@ -503,7 +503,7 @@ export default function BoardsPage() {
 
 
         {error ? (
-          error.includes("Team Members have read-only access") ? (
+          error.includes("Team Members cannot perform this action") ? (
             <div className="mb-4 flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3.5 text-sm font-medium text-violet-800 shadow-sm">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-violet-600">
                 i
