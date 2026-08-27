@@ -22,9 +22,6 @@ export default function RoleSwitcher() {
           </option>
         ))}
       </select>
-      {role === "Team Member" && (
-        <span className="rounded-md bg-amber-300 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-950">Read only</span>
-      )}
     </div>
   );
 }
