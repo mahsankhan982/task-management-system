@@ -82,7 +82,7 @@ type TaskComment = {
   updated_at: string;
 };
 
-type ActivityEntry = {
+type ActivityEntry = { details?: any;
   id: Id;
   action: string;
   user_name: string | null;
