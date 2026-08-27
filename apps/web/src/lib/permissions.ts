@@ -29,10 +29,10 @@ export const rolePermissions = {
   },
   "Team Member": {
     createTask: true,
-    assignTask: false,
-    editTask: false,
+    assignTask: true,
+    editTask: true,
     moveTask: true,
-    deleteTask: false,
+    deleteTask: true,
     comment: true,
   },
 } as const;
