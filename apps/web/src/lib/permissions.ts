@@ -28,7 +28,7 @@ export const rolePermissions = {
     comment: true,
   },
   "Team Member": {
-    createTask: false,
+    createTask: true,
     assignTask: false,
     editTask: false,
     moveTask: true,
