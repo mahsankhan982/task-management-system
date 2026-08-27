@@ -1,7 +1,31 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { db } from "../db/pool";
+import {
+  TASK_OWNERSHIP_MESSAGE,
+  checkChecklistEditAccess,
+  checkTaskEditAccess,
+  type TaskEditAccess,
+} from "../lib/taskAccess";
 
 const router = Router();
+
+/**
+ * Checklist items inherit the ownership of the task they hang off: a Team
+ * Member may only touch the checklist of a task they created.
+ */
+function refuseChecklistEdit(res: Response, access: TaskEditAccess, missing: string) {
+  if (access === "not_found") {
+    res.status(404).json({ success: false, message: missing });
+    return true;
+  }
+
+  if (access === "forbidden") {
+    res.status(403).json({ success: false, message: TASK_OWNERSHIP_MESSAGE });
+    return true;
+  }
+
+  return false;
+}
 
 router.get("/task/:taskId", async (req, res) => {
   try {
@@ -25,6 +49,9 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ success: false, message: "Task and title are required" });
     }
 
+    const access = await checkTaskEditAccess(req.user!, task_id);
+    if (refuseChecklistEdit(res, access, "Task not found")) return;
+
     const result = await db.query(
       "INSERT INTO checklist_items (task_id, title, position) VALUES ($1, $2, $3) RETURNING *",
       [task_id, title.trim(), position ?? 0]
@@ -45,6 +72,9 @@ router.patch("/:id", async (req, res) => {
   try {
     const { title, is_completed, position } = req.body;
 
+    const access = await checkChecklistEditAccess(req.user!, req.params.id);
+    if (refuseChecklistEdit(res, access, "Checklist item not found")) return;
+
     const result = await db.query(
       "UPDATE checklist_items SET title = COALESCE($1, title), is_completed = COALESCE($2, is_completed), position = COALESCE($3, position) WHERE id = $4 RETURNING *",
       [title ?? null, is_completed ?? null, position ?? null, req.params.id]
@@ -63,6 +93,9 @@ router.patch("/:id", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   try {
+    const access = await checkChecklistEditAccess(req.user!, req.params.id);
+    if (refuseChecklistEdit(res, access, "Checklist item not found")) return;
+
     const result = await db.query(
       "DELETE FROM checklist_items WHERE id = $1 RETURNING id, task_id, title",
       [req.params.id]

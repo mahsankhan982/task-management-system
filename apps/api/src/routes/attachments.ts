@@ -11,15 +11,18 @@ async function canAddAttachment(taskId: number, userId: number, role: string) {
     return Boolean(task.rows[0]);
   }
 
-  const assigned = await db.query(
+  // A Team Member may attach to a task assigned to them, and to any task they
+  // created themselves.
+  const allowed = await db.query(
     `SELECT 1
-     FROM task_assignees
-     WHERE task_id = $1 AND user_id = $2
+     FROM tasks t
+     LEFT JOIN task_assignees ta ON ta.task_id = t.id AND ta.user_id = $2
+     WHERE t.id = $1 AND (ta.user_id IS NOT NULL OR t.created_by = $2)
      LIMIT 1`,
     [taskId, userId],
   );
 
-  return Boolean(assigned.rows[0]);
+  return Boolean(allowed.rows[0]);
 }
 
 async function notifyAssignees(taskId: number, uploaderId: number, message: string) {

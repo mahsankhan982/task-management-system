@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { apiBlobRequest, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
+import { getTaskPermissions, isTaskCreator } from "@/lib/permissions";
 
 function AuthImage({ attachmentId, alt, className }: { attachmentId: Id, alt: string, className?: string }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -107,6 +108,8 @@ type TaskDetails = {
   id: Id;
   board_id: Id;
   stage_id: Id;
+  created_by: Id | null;
+  created_by_name: string | null;
   title: string;
   description: string | null;
   priority: Priority;
@@ -148,7 +151,7 @@ export default function RealTaskModal({
   onClose,
   onChanged,
 }: Props) {
-  const { permissions, role, user } = useRole();
+  const { role, user } = useRole();
   const [task, setTask] = useState<TaskDetails | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowStage[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -271,6 +274,18 @@ export default function RealTaskModal({
         (assignee) => Number(assignee.id) === Number(user.id),
       ),
     [task?.assignees, user.id],
+  );
+
+  const isMyTask = useMemo(
+    () => isTaskCreator(user.id, task?.created_by),
+    [task?.created_by, user.id],
+  );
+
+  // A Team Member only edits tasks they created; every other role keeps the
+  // permissions of its role. Falls back to no-edit while the task loads.
+  const permissions = useMemo(
+    () => getTaskPermissions(role, user.id, task?.created_by),
+    [role, user.id, task?.created_by],
   );
 
   const mentionQuery = useMemo(() => {
@@ -733,6 +748,20 @@ export default function RealTaskModal({
             <h2 className="mt-1 truncate text-xl font-semibold text-slate-950">
               {task?.title ?? "Loading task..."}
             </h2>
+
+            {task ? (
+              <p className="mt-1 truncate text-xs text-slate-500">
+                Created by{" "}
+                <span className="font-semibold text-slate-700">
+                  {isMyTask ? "you" : task.created_by_name ?? "Unknown"}
+                </span>
+                {!permissions.editTask && role === "Team Member" ? (
+                  <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                    View only
+                  </span>
+                ) : null}
+              </p>
+            ) : null}
           </div>
 
           <div className="ml-4 flex items-center gap-2">
@@ -879,6 +908,20 @@ export default function RealTaskModal({
                     {error}
                   </div>
                 )
+              ) : null}
+
+              {role === "Team Member" && !permissions.editTask ? (
+                <div className="mb-5 flex items-start gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3.5 text-sm font-medium text-violet-800 shadow-sm">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+                    i
+                  </span>
+                  <span>
+                    This task was created by{" "}
+                    {task.created_by_name ?? "another member"}, so only they can
+                    edit it. You can still comment
+                    {isAssignedToMe ? " and update its status" : ""}.
+                  </span>
+                </div>
               ) : null}
 
               <div>

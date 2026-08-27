@@ -1,9 +1,30 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { db } from "../db/pool";
 import { getBoardName, notifyMake } from '../lib/notifyMake';
+import { TASK_OWNERSHIP_MESSAGE, checkTaskEditAccess } from "../lib/taskAccess";
 
 const router = Router();
 const allowedPriorities = ["Critical", "High", "Medium", "Low"];
+
+/**
+ * Blocks the request when the caller may not change this task and answers with
+ * the reason. Returns true when the handler should stop.
+ */
+async function refuseTaskEdit(req: Request, res: Response, taskId: unknown) {
+  const access = await checkTaskEditAccess(req.user!, taskId);
+
+  if (access === "not_found") {
+    res.status(404).json({ success: false, message: "Task not found" });
+    return true;
+  }
+
+  if (access === "forbidden") {
+    res.status(403).json({ success: false, message: TASK_OWNERSHIP_MESSAGE });
+    return true;
+  }
+
+  return false;
+}
 
 router.get("/", async (_req, res) => {
   try {
@@ -12,6 +33,7 @@ router.get("/", async (_req, res) => {
          t.*,
          b.name AS board_name,
          w.name AS stage_name,
+         cb.full_name AS created_by_name,
          COALESCE(
            (
              SELECT json_agg(
@@ -32,6 +54,7 @@ router.get("/", async (_req, res) => {
        FROM tasks t
        JOIN boards b ON b.id = t.board_id
        JOIN workflow_stages w ON w.id = t.stage_id
+       LEFT JOIN users cb ON cb.id = t.created_by
        ORDER BY t.created_at DESC`
     );
     return res.status(200).json({ success: true, data: result.rows });
@@ -44,7 +67,7 @@ router.get("/", async (_req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const taskResult = await db.query(
-      "SELECT t.*, b.name AS board_name, w.name AS stage_name FROM tasks t JOIN boards b ON b.id = t.board_id JOIN workflow_stages w ON w.id = t.stage_id WHERE t.id = $1",
+      "SELECT t.*, b.name AS board_name, w.name AS stage_name, cb.full_name AS created_by_name FROM tasks t JOIN boards b ON b.id = t.board_id JOIN workflow_stages w ON w.id = t.stage_id LEFT JOIN users cb ON cb.id = t.created_by WHERE t.id = $1",
       [req.params.id]
     );
 
@@ -329,6 +352,8 @@ router.patch("/:id/status", async (req, res) => {
 });
 
 router.put("/:id/assignees", async (req, res) => {
+  if (await refuseTaskEdit(req, res, req.params.id)) return;
+
   const client = await db.connect();
   try {
     const { assignee_ids } = req.body;
@@ -410,6 +435,8 @@ router.put("/:id/assignees", async (req, res) => {
 });
 
 router.put("/:id/labels", async (req, res) => {
+  if (await refuseTaskEdit(req, res, req.params.id)) return;
+
   const client = await db.connect();
   try {
     const { label_ids } = req.body;
@@ -451,7 +478,7 @@ router.put("/:id/labels", async (req, res) => {
 });
 
 router.patch("/:id", async (req, res) => {
-  
+  if (await refuseTaskEdit(req, res, req.params.id)) return;
 
   const client = await db.connect();
   try {
@@ -557,6 +584,8 @@ router.patch("/:id", async (req, res) => {
 });
 
 router.delete("/:id", async (req, res) => {
+  if (await refuseTaskEdit(req, res, req.params.id)) return;
+
   const client = await db.connect();
   try {
     await client.query("BEGIN");

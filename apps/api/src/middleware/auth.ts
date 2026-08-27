@@ -68,39 +68,67 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 }
 
+/**
+ * Routes a Team Member may write to without owning anything in particular:
+ * discussion, their own notification state, and attachments (the attachments
+ * route runs its own assigned-task check).
+ */
+const teamMemberOpenPrefixes = ["/api/comments", "/api/notifications", "/api/attachments"];
+
+/**
+ * Task-scoped writes a Team Member is allowed to attempt. These are not waved
+ * through: the route handlers behind them enforce per-task ownership with
+ * `checkTaskEditAccess`, so a Team Member only ever changes tasks they created
+ * (plus the status flow on tasks assigned to them).
+ */
+function isTeamMemberTaskWrite(method: string, rawPath: string) {
+  const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, "") : rawPath;
+
+  // Create a task, and assign it to whoever should work on it.
+  if (path === "/api/tasks" && method === "POST") {
+    return true;
+  }
+
+  // Move an assigned task along its status flow.
+  if (method === "PATCH" && /^\/api\/tasks\/\d+\/status$/.test(path)) {
+    return true;
+  }
+
+  // Edit / delete an owned task, and its assignees and labels.
+  if (/^\/api\/tasks\/\d+(\/(assignees|labels))?$/.test(path)) {
+    return true;
+  }
+
+  // Checklist items belong to a task and inherit that task's ownership.
+  if (path === "/api/checklist" || /^\/api\/checklist\/\d+$/.test(path)) {
+    return true;
+  }
+
+  return false;
+}
+
 export function preventTeamMemberWrites(req: Request, res: Response, next: NextFunction) {
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     return next();
   }
 
-  if (req.path.startsWith("/api/comments")) {
+  if (teamMemberOpenPrefixes.some((prefix) => req.path.startsWith(prefix))) {
     return next();
   }
 
-  if (req.path.startsWith("/api/notifications")) {
+  if (req.user?.role !== "Team Member") {
     return next();
   }
 
-  if (req.path.startsWith("/api/attachments")) {
+  if (isTeamMemberTaskWrite(req.method, req.path)) {
     return next();
   }
 
-  if (
-    req.user?.role === "Team Member" &&
-    req.method === "PATCH" &&
-    /^\/api\/tasks\/\d+\/status$/.test(req.path)
-  ) {
-    return next();
-  }
-
-  if (req.user?.role === "Team Member") {
-    return res.status(403).json({
-      success: false,
-      message: "Team Members have read-only access except for comments, attachments on assigned tasks, and their assigned task status",
-    });
-  }
-
-  return next();
+  return res.status(403).json({
+    success: false,
+    message:
+      "Team Members can create and manage their own tasks, comment, and update tasks assigned to them. Boards, lists, teams and users are managed by Team Leads and above.",
+  });
 }
 
 export function requireManagerWrites(req: Request, res: Response, next: NextFunction) {

@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
+import { isTaskCreator } from "@/lib/permissions";
 import RealTaskModal from "@/components/tasks/real-task-modal";
 import BoardNavPanels from "@/components/boards/board-nav-panels";
 
@@ -51,6 +52,8 @@ type Task = {
   due_date: string | null;
   board_name: string;
   stage_name: string;
+  created_by: number | null;
+  created_by_name: string | null;
   assignees: Array<{ id: number; full_name: string }>;
 };
 
@@ -119,6 +122,9 @@ export default function BoardsPage() {
         id: Number(task.id),
         board_id: Number(task.board_id),
         stage_id: Number(task.stage_id),
+        created_by: task.created_by === null || task.created_by === undefined
+          ? null
+          : Number(task.created_by),
       }));
 
       const nextWorkflow = (workflowResponse.data ?? [])
@@ -263,9 +269,13 @@ export default function BoardsPage() {
     if (!task || !targetStage) return;
     const targetStageName = ["Review", "Waiting for Lead"].includes(targetStage.name) ? "Waiting for Review" : targetStage.name;
 
-    if (role === "Team Member") {
+    // Team Members drag their own tasks freely; on a task somebody else
+    // created they are limited to the status flow of tasks assigned to them.
+    const followsStatusFlow = role === "Team Member" && !isTaskCreator(user.id, task.created_by);
+
+    if (followsStatusFlow) {
       const assignedToMe = task.assignees?.some((a) => Number(a.id) === Number(user.id));
-      if (!assignedToMe) { setError("You can only move tasks assigned to you"); return; }
+      if (!assignedToMe) { setError("You can only move tasks you created or that are assigned to you"); return; }
       const allowedNextStage: Record<string, string> = { "To Do": "In Progress", "In Progress": "Waiting for Review", "Waiting for Review": "Completed" };
       if (allowedNextStage[task.stage_name] !== targetStageName) {
         setError("");
@@ -276,7 +286,7 @@ export default function BoardsPage() {
     const previous = tasks;
     setTasks((current) => current.map((item) => item.id === taskId ? { ...item, stage_id: stageId, stage_name: targetStageName } : item));
     try {
-      if (role === "Team Member") {
+      if (followsStatusFlow) {
         await apiRequest(`/tasks/${taskId}/status`, { method: "PATCH", body: JSON.stringify({ stage_name: targetStageName }) });
       } else {
         await apiRequest(`/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ stage_id: stageId }) });
@@ -290,7 +300,7 @@ export default function BoardsPage() {
   function handleDragStart(event: DragEvent<HTMLElement>, taskId: number) {
     const task = tasks.find((item) => item.id === taskId);
     if (!task) { event.preventDefault(); return; }
-    if (role === "Team Member") {
+    if (role === "Team Member" && !isTaskCreator(user.id, task.created_by)) {
       const assignedToMe = task.assignees?.some((a) => Number(a.id) === Number(user.id));
       if (!assignedToMe) { event.preventDefault(); return; }
     } else if (!permissions.moveTask) { event.preventDefault(); return; }
@@ -609,7 +619,12 @@ export default function BoardsPage() {
                       {stageTasks.map((task) => (
                         <article
                           key={task.id}
-                          draggable={role === "Team Member" ? Boolean(task.assignees?.some((a) => Number(a.id) === Number(user.id))) : permissions.moveTask}
+                          draggable={
+                            role === "Team Member"
+                              ? isTaskCreator(user.id, task.created_by) ||
+                                Boolean(task.assignees?.some((a) => Number(a.id) === Number(user.id)))
+                              : permissions.moveTask
+                          }
                           onClick={() => {
                             setSelectedTaskInitialEdit(false);
                             setSelectedTaskId(task.id);
@@ -618,15 +633,29 @@ export default function BoardsPage() {
                           onDragEnd={() => setDraggedTaskId(null)}
                           className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md"
                         >
-                          <span
-                            className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${priorityClass[task.priority]}`}
-                          >
-                            {task.priority}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${priorityClass[task.priority]}`}
+                            >
+                              {task.priority}
+                            </span>
+
+                            {isTaskCreator(user.id, task.created_by) ? (
+                              <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">
+                                Created by you
+                              </span>
+                            ) : null}
+                          </div>
 
                           <h3 className="mt-2.5 text-sm font-semibold leading-5 text-slate-900">
                             {task.title}
                           </h3>
+
+                          {task.created_by_name && !isTaskCreator(user.id, task.created_by) ? (
+                            <p className="mt-1.5 truncate text-[11px] text-slate-500">
+                              Created by {task.created_by_name}
+                            </p>
+                          ) : null}
 
                           <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-slate-500">
                             <span className="flex items-center gap-1">
