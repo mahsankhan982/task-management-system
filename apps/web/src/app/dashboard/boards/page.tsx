@@ -300,7 +300,7 @@ export default function BoardsPage() {
   }
   async function handleCreateTask(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedBoardId || !permissions.createTask) return;
+    if (!selectedBoardId) return;
 
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
