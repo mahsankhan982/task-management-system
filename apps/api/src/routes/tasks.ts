@@ -137,7 +137,7 @@ router.post("/", async (req, res) => {
 
     await client.query(
       "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
-      [task.id, req.user!.id, "task_created", JSON.stringify({ title: task.title, priority: task.priority })]
+      [task.id, req.user!.id, "task_created", JSON.stringify({ title: task.title, description: task.description, priority: task.priority, due_date: task.due_date })]
     );
 
     await client.query("COMMIT");
@@ -379,7 +379,7 @@ router.put("/:id/assignees", async (req, res) => {
 
     await client.query(
       "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
-      [req.params.id, req.user!.id, "task_assignees_updated", JSON.stringify({ assignee_ids: ids })]
+      [req.params.id, req.user!.id, "task_assignees_updated", JSON.stringify({ assignee_ids: ids, assignee_names: (await client.query("SELECT full_name FROM users WHERE id = ANY($1::int[])", [ids])).rows.map((u)=>u.full_name), due_date: task.rows[0].due_date })]
     );
 
     await client.query("COMMIT");
