@@ -354,7 +354,7 @@ export default function RealTaskModal({
   }
 
   async function updateMyTaskStatus(stageName: "In Progress" | "Waiting for Review" | "Completed") {
-    if (role !== "Team Member" || !task || !isAssignedToMe) return;
+    if (false || !task || !isAssignedToMe) return;
 
     try {
       setStatusUpdating(true);
@@ -606,7 +606,7 @@ export default function RealTaskModal({
 
   async function deleteAttachment(attachment: TaskAttachment) {
     const canDelete =
-      role !== "Team Member" ||
+      false ||
       Number(attachment.uploaded_by) === Number(user.id);
 
     if (!canDelete) return;
@@ -736,7 +736,7 @@ export default function RealTaskModal({
           </div>
 
           <div className="ml-4 flex items-center gap-2">
-            {role === "Team Member" && task && isAssignedToMe ? (
+            {task ? (
               <>
                 {task.stage_name === "Completed" ? (
                   <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
@@ -1058,7 +1058,7 @@ export default function RealTaskModal({
                               : FileText;
 
                       const canDelete =
-                        role !== "Team Member" ||
+                        false ||
                         Number(attachment.uploaded_by) === Number(user.id);
 
                       return (
