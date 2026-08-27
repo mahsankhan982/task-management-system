@@ -268,7 +268,7 @@ export default function BoardsPage() {
       if (!assignedToMe) { setError("You can only move tasks assigned to you"); return; }
       const allowedNextStage: Record<string, string> = { "To Do": "In Progress", "In Progress": "Waiting for Review", "Waiting for Review": "Completed" };
       if (allowedNextStage[task.stage_name] !== targetStageName) {
-        setError("Team Members must follow: To Do -> In Progress -> Waiting for Review -> Completed");
+        setError("");
         return;
       }
     } else if (!permissions.moveTask) return;
