@@ -315,7 +315,17 @@ router.patch("/:id/status", async (req, res) => {
         JSON.stringify({ stage_name }),
       ],
     );
-
+    if (stage_name === "Waiting for Review") {
+      await client.query(
+        `INSERT INTO notifications (user_id, task_id, type, title, message)
+         VALUES ($1, $2, 'task_review_required', 'Task waiting for review', $3)`,
+        [
+          task.created_by,
+          task.id,
+          `Task "${task.title}" is waiting for your review.`,
+        ],
+      );
+    }
     await client.query("COMMIT");
 
 
