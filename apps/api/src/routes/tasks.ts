@@ -521,10 +521,10 @@ router.patch("/:id", async (req, res) => {
     }
 
     await client.query("BEGIN");
-    const previousTaskResult = await client.query(
-      'SELECT id, title, board_id, stage_id, description, priority, due_date FROM tasks WHERE id = $1 FOR UPDATE',
-      [req.params.id],
-    );
+   const previousTaskResult = await client.query(
+  'SELECT id, title, board_id, stage_id, description, priority, due_date, created_by FROM tasks WHERE id = $1 FOR UPDATE',
+  [req.params.id],
+);
     const previousTask = previousTaskResult.rows[0];
 
     if (!previousTask) {
@@ -605,6 +605,28 @@ router.patch("/:id", async (req, res) => {
  }
 
  if (Number(previousTask.stage_id) !== Number(updatedTask.stage_id) || Number(previousTask.board_id) !== Number(updatedTask.board_id)) {
+void notifyMake('task_moved', taskRef, req.user!.id, {
+  previous_stage_id: previousTask.stage_id,
+  stage_id: updatedTask.stage_id,
+});
+if (stage_id !== undefined) {
+  const stageCheck = await db.query(
+    "SELECT name FROM workflow_stages WHERE id = $1",
+    [updatedTask.stage_id]
+  );
+
+  if (stageCheck.rows[0]?.name === "Waiting for Review") {
+    await db.query(
+      `INSERT INTO notifications (user_id, task_id, type, title, message)
+       VALUES ($1, $2, 'task_review_required', 'Task waiting for review', $3)`,
+      [
+        updatedTask.created_by,
+        updatedTask.id,
+        `Task "${updatedTask.title}" is waiting for your review.`,
+      ]
+    );
+  }
+}
  const previousBoardName = await getBoardName(previousTask.board_id);
  void notifyMake(
  'task_moved',
