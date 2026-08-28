@@ -1502,7 +1502,15 @@ export default function RealTaskModal({
                       <div key={String(entry.id)} className="rounded-xl border bg-white p-3">
                         <p className="text-sm text-slate-700">
                           <span className="font-semibold">{entry.user_name || "System"}</span>{" "}
-                          {entry.action === "task_assignees_updated" && entry.details?.assignee_names ? `assigned task to ${entry.details.assignee_names.join(", ")}${entry.details.due_date ? ` (Deadline: ${entry.details.due_date})` : ""}` : entry.action.replaceAll("_", " ")}
+                         {entry.action === "task_assignees_updated" && entry.details?.assignee_names
+  ? `assigned task to ${entry.details.assignee_names.join(", ")}`
+  : entry.action === "deadline_updated"
+  ? `Deadline updated from ${entry.details?.previous || "none"} to ${entry.details?.current || "none"}`
+  : entry.action === "task_created"
+  ? `Task Created: ${entry.details?.title || ""} ${entry.details?.description ? "- " + entry.details.description : ""}`
+  : entry.action === "task_updated"
+  ? `Task Updated: ${entry.details?.title || ""} ${entry.details?.description ? "- " + entry.details.description : ""}`
+  : entry.action.replaceAll("_", " ")}
                         </p>
                         <p className="mt-1 text-[11px] text-slate-400">
                           {formatDate(entry.created_at)}
