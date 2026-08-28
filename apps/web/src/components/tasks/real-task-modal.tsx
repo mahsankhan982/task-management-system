@@ -1439,7 +1439,11 @@ export default function RealTaskModal({
                         <div className="mt-2 space-y-2">
                           <textarea
                             value={editingCommentBody}
-                            onChange={(e) => setEditingCommentBody(e.target.value)}
+onChange={(e)=>{
+  const value = e.target.value;
+  setEditingCommentBody(value);
+  setComment(value);
+}}
                             className="w-full rounded-lg border p-2 text-sm"
                           />
 
