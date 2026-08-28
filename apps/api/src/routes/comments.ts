@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { db } from "../db/pool";
 import { getBoardName, notifyMake } from '../lib/notifyMake';
+import {
+  notifyMentionedUsers,
+  notifyTaskCreator,
+  shortenForNotification,
+} from "../lib/taskNotifications";
 
 const router = Router();
 
@@ -47,7 +52,7 @@ router.post("/", async (req, res) => {
     await client.query("BEGIN");
 
     const taskResult = await client.query(
-      "SELECT id, title, board_id FROM tasks WHERE id = $1",
+      "SELECT id, title, board_id, created_by FROM tasks WHERE id = $1",
       [task_id]
     );
 
@@ -65,26 +70,30 @@ router.post("/", async (req, res) => {
     );
 
     if (mentions.length > 0) {
-      await client.query(
-        `INSERT INTO notifications (user_id, task_id, type, title, message)
-         SELECT
-           u.id,
-           $1,
-           'mention',
-           'You were mentioned',
-           $2
-         FROM users u
-         WHERE u.id = ANY($3::bigint[])
-           AND u.id <> $4
-           AND u.is_active = TRUE`,
-        [
-          task_id,
-          `You were mentioned in task "${taskResult.rows[0].title}".`,
-          mentions,
-          req.user!.id,
-        ]
+      await notifyMentionedUsers(
+        {
+          taskId: task_id,
+          actorId: req.user!.id,
+          userIds: mentions,
+          message: `{actor} mentioned you in task "${taskResult.rows[0].title}": ${shortenForNotification(body)}`,
+        },
+        client,
       );
     }
+
+    // The person who raised the task follows the discussion on it. A mentioned
+    // creator already has the mention, so they are not told twice.
+    await notifyTaskCreator(
+      {
+        task: taskResult.rows[0],
+        actorId: req.user!.id,
+        type: "task_comment",
+        title: "New comment",
+        message: `{actor} commented on task "${taskResult.rows[0].title}": ${shortenForNotification(body)}`,
+        skipUserIds: mentions,
+      },
+      client,
+    );
 
     await client.query("COMMIT");
 
@@ -140,7 +149,7 @@ router.patch("/:id", async (req, res) => {
     await client.query("BEGIN");
 
     const commentResult = await client.query(
-      "SELECT c.*, t.title AS task_title FROM comments c JOIN tasks t ON t.id = c.task_id WHERE c.id = $1",
+      "SELECT c.*, t.title AS task_title, t.created_by AS task_created_by FROM comments c JOIN tasks t ON t.id = c.task_id WHERE c.id = $1",
       [id]
     );
     const comment = commentResult.rows[0];
@@ -166,14 +175,32 @@ router.patch("/:id", async (req, res) => {
     );
 
     if (mentions.length > 0) {
-      await client.query(
-        `INSERT INTO notifications (user_id, task_id, type, title, message)
-         SELECT u.id, $1, 'mention', 'You were mentioned', $2
-         FROM users u
-         WHERE u.id = ANY($3::bigint[]) AND u.id <> $4 AND u.is_active = TRUE`,
-        [comment.task_id, `You were mentioned in task "${comment.task_title}".`, mentions, req.user!.id]
+      await notifyMentionedUsers(
+        {
+          taskId: comment.task_id,
+          actorId: req.user!.id,
+          userIds: mentions,
+          message: `{actor} mentioned you in task "${comment.task_title}": ${shortenForNotification(body)}`,
+        },
+        client,
       );
     }
+
+    await notifyTaskCreator(
+      {
+        task: {
+          id: comment.task_id,
+          title: comment.task_title,
+          created_by: comment.task_created_by,
+        },
+        actorId: req.user!.id,
+        type: "task_comment_edited",
+        title: "Comment edited",
+        message: `{actor} edited a comment on task "${comment.task_title}": ${shortenForNotification(body)}`,
+        skipUserIds: mentions,
+      },
+      client,
+    );
 
     await client.query("COMMIT");
     return res.status(200).json({ success: true, data: result.rows[0] });

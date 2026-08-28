@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import { db } from "../db/pool";
 import { getBoardName, notifyMake } from '../lib/notifyMake';
+import { loadNotifiableTask, notifyTaskCreator } from "../lib/taskNotifications";
 
 const router = Router();
 const MAX_FILE_BYTES = 3 * 1024 * 1024;
@@ -25,25 +26,52 @@ async function canAddAttachment(taskId: number, userId: number, role: string) {
   return Boolean(allowed.rows[0]);
 }
 
-async function notifyAssignees(taskId: number, uploaderId: number, message: string) {
+/**
+ * Attachment changes go to the people following the task: everyone working on it
+ * hears about a new file, and the person who raised the task hears about every
+ * attachment arriving or leaving.
+ */
+async function notifyAttachmentChange(
+  taskId: number,
+  actorId: number,
+  change: "added" | "removed",
+  description: string,
+) {
   try {
-    const taskResult = await db.query("SELECT title FROM tasks WHERE id = $1 LIMIT 1", [taskId]);
-    const taskTitle = taskResult.rows[0]?.title || "Task";
-    
-    const assignees = await db.query(
-      "SELECT user_id FROM task_assignees WHERE task_id = $1 AND user_id != $2",
-      [taskId, uploaderId]
-    );
+    const task = await loadNotifiableTask(taskId);
 
-    for (const row of assignees.rows) {
-      await db.query(
-        `INSERT INTO notifications (user_id, task_id, type, title, message)
-         VALUES ($1, $2, 'attachment_added', 'New attachment', $3)`,
-        [row.user_id, taskId, `New attachment added to "${taskTitle}": ${message}`]
+    if (!task) return;
+
+    if (change === "added") {
+      const assignees = await db.query(
+        "SELECT user_id FROM task_assignees WHERE task_id = $1 AND user_id != $2",
+        [taskId, actorId]
       );
+
+      for (const row of assignees.rows) {
+        // The creator gets their own message below.
+        if (Number(row.user_id) === Number(task.created_by)) continue;
+
+        await db.query(
+          `INSERT INTO notifications (user_id, task_id, type, title, message)
+           VALUES ($1, $2, 'task_attachment_added', 'New attachment', $3)`,
+          [row.user_id, taskId, `New attachment on "${task.title}": ${description}`]
+        );
+      }
     }
+
+    await notifyTaskCreator({
+      task,
+      actorId,
+      type: change === "added" ? "task_attachment_added" : "task_attachment_removed",
+      title: change === "added" ? "New attachment" : "Attachment removed",
+      message:
+        change === "added"
+          ? `{actor} attached ${description} to task "${task.title}".`
+          : `{actor} removed the attachment ${description} from task "${task.title}".`,
+    });
   } catch (error) {
-    console.error("Notify assignees failed:", error);
+    console.error("Notify attachment change failed:", error);
   }
 }
 
@@ -147,7 +175,7 @@ router.post(
         ],
       );
 
-      await notifyAssignees(taskId, req.user!.id, fileName);
+      await notifyAttachmentChange(taskId, req.user!.id, "added", fileName);
 
       void (async () => {
         const taskRow = await db.query('SELECT title, board_id FROM tasks WHERE id = $1', [taskId]);
@@ -233,7 +261,12 @@ router.post("/link", async (req, res) => {
       ],
     );
 
-    await notifyAssignees(taskId, req.user!.id, label || parsed.toString());
+    await notifyAttachmentChange(
+      taskId,
+      req.user!.id,
+      "added",
+      label || parsed.toString(),
+    );
 
     void (async () => {
       const taskRow = await db.query('SELECT title, board_id FROM tasks WHERE id = $1', [taskId]);
@@ -339,6 +372,13 @@ router.delete("/:id", async (req, res) => {
           url: attachment.url,
         }),
       ],
+    );
+
+    await notifyAttachmentChange(
+      Number(attachment.task_id),
+      req.user!.id,
+      "removed",
+      attachment.file_name || attachment.url || "a file",
     );
 
     return res.status(200).json({ success: true, message: "Attachment deleted" });

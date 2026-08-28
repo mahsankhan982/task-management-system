@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db } from "../db/pool";
 import { getBoardName, notifyMake } from '../lib/notifyMake';
 import { TASK_OWNERSHIP_MESSAGE, checkTaskEditAccess } from "../lib/taskAccess";
+import { notifyAssignedUser, notifyTaskCreator } from "../lib/taskNotifications";
 
 const router = Router();
 const allowedPriorities = ["Critical", "High", "Medium", "Low"];
@@ -169,10 +170,14 @@ router.post("/", async (req, res) => {
         );
 
         if (userId !== req.user!.id) {
-          await client.query(
-            `INSERT INTO notifications (user_id, task_id, type, title, message)
-             VALUES ($1, $2, 'task_assigned', 'New task assigned', $3)`,
-            [userId, task.id, `Task "${task.title}" was assigned to you.`]
+          await notifyAssignedUser(
+            {
+              taskId: task.id,
+              taskTitle: task.title,
+              userId,
+              actorId: req.user!.id,
+            },
+            client,
           );
         }
       }
@@ -319,32 +324,46 @@ router.patch("/:id/status", async (req, res) => {
         JSON.stringify({ stage_name, previous_stage_name: currentStageName }),
       ],
     );
-console.log("WAITING REVIEW NOTIFICATION TRIGGERED", task.id, task.created_by);
+
+    // Whoever raised the task hears about the move. Entering and leaving review
+    // get their own wording because those are the ones that need an answer.
     if (stage_name === "Waiting for Review") {
-      await client.query(
-        `INSERT INTO notifications (user_id, task_id, type, title, message)
-         VALUES ($1, $2, 'task_review_required', 'Task waiting for review', $3)`,
-        [
-          task.created_by,
-          task.id,
-          `Task "${task.title}" is waiting for your review.`,
-        ],
+      await notifyTaskCreator(
+        {
+          task,
+          actorId: req.user.id,
+          type: "task_review_required",
+          title: "Task waiting for review",
+          message: `{actor} moved "${task.title}" to Waiting for Review, so it is waiting for your review.`,
+        },
+        client,
+      );
+    } else if (reviewStageNames.includes(currentStageName)) {
+      // The assignee pulled the task back out of review, so the reviewer should
+      // know the pending review request no longer applies.
+      await notifyTaskCreator(
+        {
+          task,
+          actorId: req.user.id,
+          type: "task_review_withdrawn",
+          title: "Task moved back from review",
+          message: `{actor} moved "${task.title}" back to ${stage_name}, so it is no longer waiting for your review.`,
+        },
+        client,
+      );
+    } else {
+      await notifyTaskCreator(
+        {
+          task,
+          actorId: req.user.id,
+          type: "task_stage_changed",
+          title: "Task moved to a new stage",
+          message: `{actor} moved "${task.title}" from ${currentStageName || "another stage"} to ${stage_name}.`,
+        },
+        client,
       );
     }
 
-    // The assignee pulled the task back out of review, so the reviewer should
-    // know the pending review request no longer applies.
-    if (reviewStageNames.includes(currentStageName)) {
-      await client.query(
-        `INSERT INTO notifications (user_id, task_id, type, title, message)
-         VALUES ($1, $2, 'task_review_withdrawn', 'Task moved back from review', $3)`,
-        [
-          task.created_by,
-          task.id,
-          `Task "${task.title}" was moved back to ${stage_name} and is no longer waiting for your review.`,
-        ],
-      );
-    }
     await client.query("COMMIT");
 
 
@@ -393,7 +412,10 @@ router.put("/:id/assignees", async (req, res) => {
     const ids = [...new Set(assignee_ids.map(Number).filter((id: number) => Number.isInteger(id) && id > 0))];
     await client.query("BEGIN");
 
-    const task = await client.query("SELECT id, title, board_id FROM tasks WHERE id = $1", [req.params.id]);
+    const task = await client.query(
+      "SELECT id, title, board_id, due_date, created_by FROM tasks WHERE id = $1",
+      [req.params.id],
+    );
     if (!task.rows[0]) {
       await client.query("ROLLBACK");
       return res.status(404).json({ success: false, message: "Task not found" });
@@ -409,6 +431,18 @@ router.put("/:id/assignees", async (req, res) => {
 
 
     const addedIds = ids.filter((userId) => !previousIds.has(userId));
+    const removedIds = [...previousIds].filter((userId) => !ids.includes(userId));
+
+    // One lookup covers both the activity log and the notification wording.
+    const memberNames = await client.query(
+      "SELECT id, full_name FROM users WHERE id = ANY($1::bigint[])",
+      [[...new Set([...previousIds, ...ids])]],
+    );
+    const nameById = new Map<number, string>(
+      memberNames.rows.map((row) => [Number(row.id), String(row.full_name)]),
+    );
+    const namesOf = (userIds: number[]) =>
+      userIds.map((userId) => nameById.get(userId) ?? `User ${userId}`);
 
     await client.query("DELETE FROM task_assignees WHERE task_id = $1", [req.params.id]);
 
@@ -418,23 +452,47 @@ router.put("/:id/assignees", async (req, res) => {
         [req.params.id, userId, req.user!.id]
       );
 
-      if (!previousIds.has(userId) && userId !== req.user!.id) {
-        await client.query(
-          `INSERT INTO notifications (user_id, task_id, type, title, message)
-           VALUES ($1, $2, 'task_assigned', 'New task assigned', $3)`,
-          [
+      if (!previousIds.has(userId)) {
+        await notifyAssignedUser(
+          {
+            taskId: req.params.id,
+            taskTitle: task.rows[0].title,
             userId,
-            req.params.id,
-            `Task "${task.rows[0].title}" was assigned to you.`,
-          ]
+            actorId: req.user!.id,
+          },
+          client,
         );
       }
     }
 
     await client.query(
       "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
-      [req.params.id, req.user!.id, "task_assignees_updated", JSON.stringify({ assignee_ids: ids, assignee_names: (await client.query("SELECT full_name FROM users WHERE id = ANY($1::int[])", [ids])).rows.map((u)=>u.full_name), due_date: task.rows[0].due_date })]
+      [req.params.id, req.user!.id, "task_assignees_updated", JSON.stringify({ assignee_ids: ids, assignee_names: namesOf(ids), due_date: task.rows[0].due_date })]
     );
+
+    // The person who raised the task follows every change to who works on it.
+    if (addedIds.length > 0 || removedIds.length > 0) {
+      const memberChanges: string[] = [];
+
+      if (addedIds.length > 0) {
+        memberChanges.push(`added ${namesOf(addedIds).join(", ")}`);
+      }
+
+      if (removedIds.length > 0) {
+        memberChanges.push(`removed ${namesOf(removedIds).join(", ")}`);
+      }
+
+      await notifyTaskCreator(
+        {
+          task: task.rows[0],
+          actorId: req.user!.id,
+          type: "task_members_changed",
+          title: "Task members changed",
+          message: `{actor} ${memberChanges.join(" and ")} on task "${task.rows[0].title}".`,
+        },
+        client,
+      );
+    }
 
     await client.query("COMMIT");
 
@@ -476,11 +534,22 @@ router.put("/:id/labels", async (req, res) => {
     const ids = [...new Set(label_ids.map(Number).filter((id: number) => Number.isInteger(id) && id > 0))];
     await client.query("BEGIN");
 
-    const task = await client.query("SELECT id FROM tasks WHERE id = $1", [req.params.id]);
+    const task = await client.query(
+      "SELECT id, title, created_by FROM tasks WHERE id = $1",
+      [req.params.id],
+    );
     if (!task.rows[0]) {
       await client.query("ROLLBACK");
       return res.status(404).json({ success: false, message: "Task not found" });
     }
+
+    const previousLabels = await client.query(
+      "SELECT label_id FROM task_labels WHERE task_id = $1",
+      [req.params.id],
+    );
+    const previousLabelIds = new Set<number>(
+      previousLabels.rows.map((row) => Number(row.label_id)),
+    );
 
     await client.query("DELETE FROM task_labels WHERE task_id = $1", [req.params.id]);
     for (const labelId of ids) {
@@ -491,6 +560,32 @@ router.put("/:id/labels", async (req, res) => {
       "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
       [req.params.id, req.user!.id, "task_labels_updated", JSON.stringify({ label_ids: ids })]
     );
+
+    // Skip the notification when the same labels were sent back unchanged.
+    const labelsChanged =
+      ids.length !== previousLabelIds.size ||
+      ids.some((labelId) => !previousLabelIds.has(labelId));
+
+    if (labelsChanged) {
+      const labelNames = await client.query(
+        "SELECT name FROM labels WHERE id = ANY($1::bigint[]) ORDER BY name",
+        [ids],
+      );
+      const names = labelNames.rows.map((row) => String(row.name));
+
+      await notifyTaskCreator(
+        {
+          task: task.rows[0],
+          actorId: req.user!.id,
+          type: "task_labels_changed",
+          title: "Task labels changed",
+          message: names.length
+            ? `{actor} set the labels on task "${task.rows[0].title}" to ${names.join(", ")}.`
+            : `{actor} removed all labels from task "${task.rows[0].title}".`,
+        },
+        client,
+      );
+    }
 
     await client.query("COMMIT");
     return res.status(200).json({ success: true, label_ids: ids });
@@ -555,37 +650,122 @@ router.patch("/:id", async (req, res) => {
       return res.status(404).json({ success: false, message: "Task not found" });
     }
 
+    const updatedTask = result.rows[0];
+
     await client.query(
       "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
       [req.params.id, req.user!.id, "task_updated", JSON.stringify({
-        title: result.rows[0].title,
-        description: result.rows[0].description,
-        priority: result.rows[0].priority,
+        title: updatedTask.title,
+        description: updatedTask.description,
+        priority: updatedTask.priority,
       })]
     );
 
+    // Compare what is stored rather than what was sent: the update COALESCEs
+    // every field, so a null in the request leaves that column untouched.
+    const previousDueDate = previousTask.due_date ? String(previousTask.due_date).slice(0, 10) : null;
+    const newDueDate = updatedTask.due_date ? String(updatedTask.due_date).slice(0, 10) : null;
+    const dueDateChanged = previousDueDate !== newDueDate;
+
     // Log deadline changes separately so the UI can display a clear message
-    if (due_date !== undefined) {
-      const prevDue = previousTask.due_date ? String(previousTask.due_date).slice(0, 10) : null;
-      const newDue  = due_date ? String(due_date).slice(0, 10) : null;
-      if (prevDue !== newDue) {
-        if (!prevDue && newDue) {
-          await client.query(
-            "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
-            [req.params.id, req.user!.id, "deadline_set", JSON.stringify({ current: newDue })]
-          );
-        } else if (prevDue && newDue && prevDue !== newDue) {
-          await client.query(
-            "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
-            [req.params.id, req.user!.id, "deadline_updated", JSON.stringify({ previous: prevDue, current: newDue })]
-          );
-        }
+    if (dueDateChanged) {
+      if (!previousDueDate && newDueDate) {
+        await client.query(
+          "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
+          [req.params.id, req.user!.id, "deadline_set", JSON.stringify({ current: newDueDate })]
+        );
+      } else if (previousDueDate && newDueDate) {
+        await client.query(
+          "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
+          [req.params.id, req.user!.id, "deadline_updated", JSON.stringify({ previous: previousDueDate, current: newDueDate })]
+        );
       }
+    }
+
+    const stageChanged = Number(previousTask.stage_id) !== Number(updatedTask.stage_id);
+    const boardChanged = Number(previousTask.board_id) !== Number(updatedTask.board_id);
+
+    let previousStageName = "";
+    let newStageName = "";
+
+    if (stageChanged || boardChanged) {
+      const stageNames = await client.query(
+        "SELECT id, name FROM workflow_stages WHERE id = ANY($1::bigint[])",
+        [[previousTask.stage_id, updatedTask.stage_id]],
+      );
+      const stageNameById = new Map<number, string>(
+        stageNames.rows.map((row) => [Number(row.id), String(row.name)]),
+      );
+
+      previousStageName = stageNameById.get(Number(previousTask.stage_id)) ?? "";
+      newStageName = stageNameById.get(Number(updatedTask.stage_id)) ?? "";
+    }
+
+    // Whoever raised the task hears about the move, with the review request
+    // called out because that one is waiting on them.
+    if (stageChanged && reviewStageNames.includes(newStageName)) {
+      await notifyTaskCreator(
+        {
+          task: updatedTask,
+          actorId: req.user!.id,
+          type: "task_review_required",
+          title: "Task waiting for review",
+          message: `{actor} moved "${updatedTask.title}" to ${newStageName}, so it is waiting for your review.`,
+        },
+        client,
+      );
+    } else if (stageChanged || boardChanged) {
+      const destination = boardChanged
+        ? `to ${newStageName || "a new stage"} on the ${await getBoardName(updatedTask.board_id)} board`
+        : `from ${previousStageName || "another stage"} to ${newStageName || "another stage"}`;
+
+      await notifyTaskCreator(
+        {
+          task: updatedTask,
+          actorId: req.user!.id,
+          type: "task_stage_changed",
+          title: "Task moved to a new stage",
+          message: `{actor} moved "${updatedTask.title}" ${destination}.`,
+        },
+        client,
+      );
+    }
+
+    // ...and about every other edit, in one notification listing the changes.
+    const fieldChanges: string[] = [];
+
+    if (previousTask.title !== updatedTask.title) {
+      fieldChanges.push(`renamed it to "${updatedTask.title}"`);
+    }
+
+    if (String(previousTask.description ?? "") !== String(updatedTask.description ?? "")) {
+      fieldChanges.push("updated the description");
+    }
+
+    if (previousTask.priority !== updatedTask.priority) {
+      fieldChanges.push(`set the priority to ${updatedTask.priority}`);
+    }
+
+    if (dueDateChanged) {
+      fieldChanges.push(newDueDate ? `set the due date to ${newDueDate}` : "cleared the due date");
+    }
+
+    if (fieldChanges.length > 0) {
+      await notifyTaskCreator(
+        {
+          // The old title keeps a rename readable in the message.
+          task: { ...updatedTask, title: previousTask.title },
+          actorId: req.user!.id,
+          type: "task_updated",
+          title: "Task updated",
+          message: `{actor} updated task "${previousTask.title}": ${fieldChanges.join(", ")}.`,
+        },
+        client,
+      );
     }
 
     await client.query("COMMIT");
 
- const updatedTask = result.rows[0];
  void (async () => {
  try {
  const boardName = await getBoardName(updatedTask.board_id);
@@ -622,24 +802,6 @@ void notifyMake('task_moved', taskRef, req.user!.id, {
   previous_stage_id: previousTask.stage_id,
   stage_id: updatedTask.stage_id,
 });
-if (stage_id !== undefined) {
-  const stageCheck = await db.query(
-    "SELECT name FROM workflow_stages WHERE id = $1",
-    [updatedTask.stage_id]
-  );
-
-  if (stageCheck.rows[0]?.name === "Waiting for Review") {
-    await db.query(
-      `INSERT INTO notifications (user_id, task_id, type, title, message)
-       VALUES ($1, $2, 'task_review_required', 'Task waiting for review', $3)`,
-      [
-        updatedTask.created_by,
-        updatedTask.id,
-        `Task "${updatedTask.title}" is waiting for your review.`,
-      ]
-    );
-  }
-}
  const previousBoardName = await getBoardName(previousTask.board_id);
  void notifyMake(
  'task_moved',
@@ -679,7 +841,7 @@ router.delete("/:id", async (req, res) => {
   const client = await db.connect();
   try {
     await client.query("BEGIN");
-    const task = await client.query("SELECT id, title, board_id FROM tasks WHERE id = $1", [req.params.id]);
+    const task = await client.query("SELECT id, title, board_id, created_by FROM tasks WHERE id = $1", [req.params.id]);
 
     if (!task.rows[0]) {
       await client.query("ROLLBACK");
@@ -690,6 +852,19 @@ router.delete("/:id", async (req, res) => {
     await client.query(
       "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES (NULL,$1,$2,$3::jsonb)",
       [req.user!.id, "task_deleted", JSON.stringify({ task_id: Number(req.params.id), title: task.rows[0].title })]
+    );
+
+    // The task is gone, so the notification carries no task link.
+    await notifyTaskCreator(
+      {
+        task: task.rows[0],
+        actorId: req.user!.id,
+        type: "task_deleted",
+        title: "Task deleted",
+        message: `{actor} deleted the task "${task.rows[0].title}" that you created.`,
+        taskGone: true,
+      },
+      client,
     );
 
     await client.query("COMMIT");

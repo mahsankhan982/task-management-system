@@ -153,6 +153,21 @@ function formatDate(value: string | null) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+/**
+ * Reads @mentions back out of comment text by matching the names of people this
+ * user can see. Used when editing a comment, where there is no @ picker to keep
+ * track of who was tagged.
+ */
+function findMentionedIds(text: string, people: UserOption[]) {
+  return people
+    .filter((person) => {
+      const name = person.full_name.trim();
+      return name.length > 0 && text.includes(`@${name}`);
+    })
+    .map((person) => Number(person.id))
+    .filter((id) => Number.isInteger(id) && id > 0);
+}
+
 function dateInputValue(value: string | null) {
   if (!value) return "";
   const date = new Date(value);
@@ -776,12 +791,22 @@ export default function RealTaskModal({
     const body = editingCommentBody.trim();
     if (!body) return;
 
+    // The edit box has no @ picker, so mentions are read back out of the text.
+    // Only names that were not already there are sent, otherwise fixing a typo
+    // would notify the same people again.
+    const original =
+      task?.comments.find((entry) => String(entry.id) === String(commentId))?.body ?? "";
+    const alreadyMentioned = findMentionedIds(original, users);
+    const newMentions = findMentionedIds(body, users).filter(
+      (id) => !alreadyMentioned.includes(id),
+    );
+
     try {
       setPosting(true);
       setError("");
       await apiRequest(`/comments/${commentId}`, {
         method: "PATCH",
-        body: JSON.stringify({ body }),
+        body: JSON.stringify({ body, mention_ids: newMentions }),
       });
       setEditingCommentId(null);
       setEditingCommentBody("");

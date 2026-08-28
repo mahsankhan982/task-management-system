@@ -6,8 +6,42 @@ import {
   checkTaskEditAccess,
   type TaskEditAccess,
 } from "../lib/taskAccess";
+import {
+  loadNotifiableTask,
+  notifyTaskCreatorAfterWrite,
+  type NotificationType,
+} from "../lib/taskNotifications";
 
 const router = Router();
+
+/**
+ * Tells the person who raised the task that their checklist changed. Checklist
+ * writes are not wrapped in a transaction, so a notification problem is logged
+ * rather than failing the request.
+ */
+async function notifyChecklistChange(
+  taskId: unknown,
+  actorId: number,
+  type: NotificationType,
+  title: string,
+  describe: (taskTitle: string) => string,
+) {
+  try {
+    const task = await loadNotifiableTask(taskId);
+
+    if (!task) return;
+
+    await notifyTaskCreatorAfterWrite({
+      task,
+      actorId,
+      type,
+      title,
+      message: describe(task.title),
+    });
+  } catch (error) {
+    console.error("Notify checklist change failed:", error);
+  }
+}
 
 /**
  * Checklist items inherit the ownership of the task they hang off: a Team
@@ -57,6 +91,15 @@ router.post("/", async (req, res) => {
       [task_id, title.trim(), position ?? 0]
     );
 
+    await notifyChecklistChange(
+      task_id,
+      req.user!.id,
+      "task_checklist_added",
+      "Checklist item added",
+      (taskTitle) =>
+        `{actor} added "${title.trim()}" to the checklist on task "${taskTitle}".`,
+    );
+
     return res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
     if (error?.code === "23503") {
@@ -84,6 +127,31 @@ router.patch("/:id", async (req, res) => {
       return res.status(404).json({ success: false, message: "Checklist item not found" });
     }
 
+    const item = result.rows[0];
+
+    // A position-only change is a drag inside the list, not news for anyone.
+    if (typeof is_completed === "boolean") {
+      await notifyChecklistChange(
+        item.task_id,
+        req.user!.id,
+        "task_checklist_updated",
+        is_completed ? "Checklist item completed" : "Checklist item reopened",
+        (taskTitle) =>
+          is_completed
+            ? `{actor} ticked off "${item.title}" on task "${taskTitle}".`
+            : `{actor} reopened "${item.title}" on task "${taskTitle}".`,
+      );
+    } else if (title !== undefined && title !== null) {
+      await notifyChecklistChange(
+        item.task_id,
+        req.user!.id,
+        "task_checklist_updated",
+        "Checklist item updated",
+        (taskTitle) =>
+          `{actor} renamed a checklist item to "${item.title}" on task "${taskTitle}".`,
+      );
+    }
+
     return res.status(200).json({ success: true, data: result.rows[0] });
   } catch (error) {
     console.error("Update checklist failed:", error);
@@ -107,6 +175,15 @@ router.delete("/:id", async (req, res) => {
         message: "Checklist item not found",
       });
     }
+
+    await notifyChecklistChange(
+      result.rows[0].task_id,
+      req.user!.id,
+      "task_checklist_removed",
+      "Checklist item removed",
+      (taskTitle) =>
+        `{actor} removed "${result.rows[0].title}" from the checklist on task "${taskTitle}".`,
+    );
 
     return res.status(200).json({
       success: true,
