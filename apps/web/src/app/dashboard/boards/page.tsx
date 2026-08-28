@@ -67,9 +67,16 @@ const stageIcons = {
 
 const priorityClass: Record<Priority, string> = {
   Critical: "bg-red-50 text-red-700 border-red-200",
-  High: "bg-orange-50 text-orange-700 border-orange-200",
-  Medium: "bg-blue-50 text-blue-700 border-blue-200",
-  Low: "bg-slate-100 text-slate-600 border-slate-200",
+  High: "bg-red-50 text-red-700 border-red-200",
+  Medium: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  Low: "bg-green-50 text-green-700 border-green-200",
+};
+
+const priorityBorderClass: Record<Priority, string> = {
+  Critical: "border-l-red-500",
+  High: "border-l-red-400",
+  Medium: "border-l-yellow-400",
+  Low: "border-l-green-400",
 };
 
 export default function BoardsPage() {
@@ -462,7 +469,7 @@ export default function BoardsPage() {
               {selectedBoard?.name ?? "Boards"}
             </h1>
             <p className="mt-1 text-xs text-white/70">
-              {selectedBoard?.team_name ?? "No team"} · PostgreSQL data
+              {selectedBoard?.team_name ?? "No team"} Ã‚Â· PostgreSQL data
             </p>
           </div>
 
@@ -609,10 +616,7 @@ export default function BoardsPage() {
                   >
                     <div className="mb-2.5 flex items-center gap-2 px-1">
                       <Icon size={16} className="text-slate-600" />
-                      <h2 className="text-sm font-semibold text-slate-800">{stage.name}</h2>
-                      <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">
-                        {stageTasks.length}
-                      </span>
+                      <h2 className="text-sm font-semibold text-slate-800">{stage.name} ({stageTasks.length})</h2>
                     </div>
 
                     <div className="max-h-[285px] space-y-3 overflow-y-auto pr-1">
@@ -631,7 +635,7 @@ export default function BoardsPage() {
                           }}
                           onDragStart={(event) => handleDragStart(event, task.id)}
                           onDragEnd={() => setDraggedTaskId(null)}
-                          className="cursor-pointer rounded-lg border border-slate-200 bg-white p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md"
+                          className={`cursor-pointer rounded-lg border border-slate-200 border-l-4 bg-white p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md ${priorityBorderClass[task.priority]}`}
                         >
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span
@@ -664,7 +668,22 @@ export default function BoardsPage() {
                                 ? new Date(task.due_date).toLocaleDateString()
                                 : "No due date"}
                             </span>
-                            <span>#{task.id}</span>
+                            <div className="flex items-center gap-2">
+                              {task.assignees?.length > 0 && (
+                                <div className="flex -space-x-1.5">
+                                  {task.assignees.map((a) => (
+                                    <div
+                                      key={a.id}
+                                      title={a.full_name}
+                                      className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-100 text-[9px] font-bold text-violet-700 ring-2 ring-white"
+                                    >
+                                      {a.full_name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase()}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <span>#{task.id}</span>
+                            </div>
                           </div>
                         </article>
                       ))}

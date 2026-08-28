@@ -512,8 +512,31 @@ router.patch("/:id", async (req, res) => {
 
     await client.query(
       "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
-      [req.params.id, req.user!.id, "task_updated", JSON.stringify({ title, description, priority, due_date, stage_id, board_id })]
+      [req.params.id, req.user!.id, "task_updated", JSON.stringify({
+        title: result.rows[0].title,
+        description: result.rows[0].description,
+        priority: result.rows[0].priority,
+      })]
     );
+
+    // Log deadline changes separately so the UI can display a clear message
+    if (due_date !== undefined) {
+      const prevDue = previousTask.due_date ? String(previousTask.due_date).slice(0, 10) : null;
+      const newDue  = due_date ? String(due_date).slice(0, 10) : null;
+      if (prevDue !== newDue) {
+        if (!prevDue && newDue) {
+          await client.query(
+            "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
+            [req.params.id, req.user!.id, "deadline_set", JSON.stringify({ current: newDue })]
+          );
+        } else if (prevDue && newDue && prevDue !== newDue) {
+          await client.query(
+            "INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)",
+            [req.params.id, req.user!.id, "deadline_updated", JSON.stringify({ previous: prevDue, current: newDue })]
+          );
+        }
+      }
+    }
 
     await client.query("COMMIT");
 

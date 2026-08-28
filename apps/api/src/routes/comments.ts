@@ -124,41 +124,65 @@ router.post("/", async (req, res) => {
 });
 
 router.patch("/:id", async (req, res) => {
+  const client = await db.connect();
   try {
     const { id } = req.params;
-    const { body } = req.body;
+    const { body, mention_ids } = req.body;
 
     if (!body || typeof body !== "string" || !body.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Comment body is required",
-      });
+      return res.status(400).json({ success: false, message: "Comment body is required" });
     }
 
-    const commentResult = await db.query("SELECT * FROM comments WHERE id = $1", [id]);
+    const mentions = Array.isArray(mention_ids)
+      ? [...new Set(mention_ids.map(Number).filter((mid: number) => Number.isInteger(mid) && mid > 0))]
+      : [];
+
+    await client.query("BEGIN");
+
+    const commentResult = await client.query(
+      "SELECT c.*, t.title AS task_title FROM comments c JOIN tasks t ON t.id = c.task_id WHERE c.id = $1",
+      [id]
+    );
     const comment = commentResult.rows[0];
 
     if (!comment) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ success: false, message: "Comment not found" });
     }
 
+    // Only the comment author, Managers, and Coordinators can edit
     if (
-      false &&
+      Number(comment.user_id) !== req.user!.id &&
       req.user!.role !== "Manager" &&
       req.user!.role !== "Coordinator"
     ) {
+      await client.query("ROLLBACK");
       return res.status(403).json({ success: false, message: "Not authorized to edit this comment" });
     }
 
-    const result = await db.query(
+    const result = await client.query(
       "UPDATE comments SET body = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
       [body.trim(), id]
     );
 
+    if (mentions.length > 0) {
+      await client.query(
+        `INSERT INTO notifications (user_id, task_id, type, title, message)
+         SELECT u.id, $1, 'mention', 'You were mentioned', $2
+         FROM users u
+         WHERE u.id = ANY($3::bigint[]) AND u.id <> $4 AND u.is_active = TRUE`,
+        [comment.task_id, `You were mentioned in task "${comment.task_title}".`, mentions, req.user!.id]
+      );
+    }
+
+    await client.query("COMMIT");
     return res.status(200).json({ success: true, data: result.rows[0] });
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error("Edit comment failed:", error);
     return res.status(500).json({ success: false, message: "Unable to edit comment" });
+  } finally {
+    client.release();
   }
 });
 
