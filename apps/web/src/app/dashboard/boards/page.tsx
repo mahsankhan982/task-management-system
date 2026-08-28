@@ -323,9 +323,15 @@ export default function BoardsPage() {
     setTasks((current) => current.map((item) => item.id === taskId ? { ...item, stage_id: stageId, stage_name: targetStageName } : item));
     try {
       if (followsStatusFlow) {
-        await apiRequest(`/tasks/${taskId}/status`, { method: "PATCH", body: JSON.stringify({ stage_name: targetStageName }) });
+        await apiRequest(`/tasks/${taskId}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ stage_name: targetStageName }),
+        });
       } else {
-        await apiRequest(`/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ stage_id: stageId }) });
+        await apiRequest(`/tasks/${taskId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ stage_id: stageId }),
+        });
       }
       setError("");
     } catch (err) {
@@ -333,6 +339,7 @@ export default function BoardsPage() {
       setError(err instanceof Error ? err.message : "Unable to move task");
     }
   }
+
   function handleDragStart(event: DragEvent<HTMLElement>, taskId: number) {
     const task = tasks.find((item) => item.id === taskId);
     if (!task) { event.preventDefault(); return; }
