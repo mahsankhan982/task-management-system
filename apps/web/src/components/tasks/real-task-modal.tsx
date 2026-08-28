@@ -1472,6 +1472,7 @@ export default function RealTaskModal({
                               onClick={() => {
                                 setEditingCommentId(entry.id);
                                 setEditingCommentBody(entry.body);
+                                setComment(entry.body);
                               }}
                               className="mt-2 text-xs font-semibold text-blue-600 hover:underline"
                             >
