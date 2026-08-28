@@ -17,6 +17,7 @@ import {
   Plus,
   Save,
   Trash2,
+  Undo2,
   Upload,
   UserRound,
   Video,
@@ -132,6 +133,20 @@ type Props = {
 const priorities: Priority[] = ["Critical", "High", "Medium", "Low"];
 const modalCoreStageNames = ["To Do", "In Progress", "Waiting for Review", "Review", "Completed"] as const;
 
+type AssigneeStage = "To Do" | "In Progress" | "Waiting for Review" | "Completed";
+
+// Older boards still label the review column "Review" or "Waiting for Lead".
+function normalizeStageName(name: string | null | undefined) {
+  return name === "Review" || name === "Waiting for Lead" ? "Waiting for Review" : name ?? "";
+}
+
+// Earlier stages an assignee may send the task back to. Available until the
+// task is Completed, which only a Team Lead can undo.
+const backwardStagesByStage: Record<string, AssigneeStage[]> = {
+  "In Progress": ["To Do"],
+  "Waiting for Review": ["In Progress", "To Do"],
+};
+
 function formatDate(value: string | null) {
   if (!value) return "Not set";
   const date = new Date(value);
@@ -171,6 +186,7 @@ export default function RealTaskModal({
   const [taskMenuOpen, setTaskMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const [addingChecklist, setAddingChecklist] = useState(false);
   const [busyChecklistId, setBusyChecklistId] = useState<string | null>(null);
@@ -281,6 +297,15 @@ export default function RealTaskModal({
     [task?.created_by, user.id],
   );
 
+  const currentStageName = normalizeStageName(task?.stage_name);
+
+  // Only an assigned Team Member drives the status flow, so the move-back
+  // control stays hidden for everyone else.
+  const backwardStages = useMemo<AssigneeStage[]>(() => {
+    if (role !== "Team Member" || !isAssignedToMe) return [];
+    return backwardStagesByStage[currentStageName] ?? [];
+  }, [currentStageName, role, isAssignedToMe]);
+
   // A Team Member only edits tasks they created; every other role keeps the
   // permissions of its role. Falls back to no-edit while the task loads.
   const permissions = useMemo(
@@ -368,11 +393,12 @@ export default function RealTaskModal({
     }
   }
 
-  async function updateMyTaskStatus(stageName: "In Progress" | "Waiting for Review" | "Completed") {
+  async function updateMyTaskStatus(stageName: AssigneeStage) {
     if (false || !task || !isAssignedToMe) return;
 
     try {
       setStatusUpdating(true);
+      setStatusMenuOpen(false);
       setError("");
 
       await apiRequest(`/tasks/${taskId}/status`, {
@@ -765,13 +791,53 @@ export default function RealTaskModal({
           </div>
 
           <div className="ml-4 flex items-center gap-2">
+            {task && backwardStages.length > 0 ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (backwardStages.length === 1) {
+                      void updateMyTaskStatus(backwardStages[0]);
+                      return;
+                    }
+                    setStatusMenuOpen((value) => !value);
+                  }}
+                  disabled={statusUpdating}
+                  className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+                  title="Move this task back to an earlier stage"
+                >
+                  <Undo2 size={15} />
+                  {backwardStages.length === 1
+                    ? `Back to ${backwardStages[0]}`
+                    : "Move Back"}
+                </button>
+
+                {statusMenuOpen && backwardStages.length > 1 ? (
+                  <div className="absolute right-0 top-11 z-50 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                    {backwardStages.map((stageName) => (
+                      <button
+                        key={stageName}
+                        type="button"
+                        onClick={() => void updateMyTaskStatus(stageName)}
+                        disabled={statusUpdating}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                      >
+                        <Undo2 size={15} />
+                        Back to {stageName}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             {task ? (
               <>
-                {task.stage_name === "Completed" ? (
+                {currentStageName === "Completed" ? (
                   <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
                     Completed
                   </span>
-                ) : task.stage_name === "Waiting for Review" ? (
+                ) : currentStageName === "Waiting for Review" ? (
                   <button
                     type="button"
                     onClick={() => void updateMyTaskStatus("Completed")}
@@ -785,7 +851,7 @@ export default function RealTaskModal({
                     )}
                     {statusUpdating ? "Updating..." : "Mark Complete"}
                   </button>
-                ) : task.stage_name === "In Progress" ? (
+                ) : currentStageName === "In Progress" ? (
                   <button
                     type="button"
                     onClick={() => void updateMyTaskStatus("Waiting for Review")}
@@ -799,7 +865,7 @@ export default function RealTaskModal({
                     )}
                     {statusUpdating ? "Updating..." : "Send for Review"}
                   </button>
-                ) : task.stage_name === "To Do" ? (
+                ) : currentStageName === "To Do" ? (
                   <button
                     type="button"
                     onClick={() => void updateMyTaskStatus("In Progress")}

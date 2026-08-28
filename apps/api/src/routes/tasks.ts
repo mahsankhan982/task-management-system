@@ -5,6 +5,9 @@ import { TASK_OWNERSHIP_MESSAGE, checkTaskEditAccess } from "../lib/taskAccess";
 
 const router = Router();
 const allowedPriorities = ["Critical", "High", "Medium", "Low"];
+// Boards created before the 008 rename still label the review column "Review"
+// or "Waiting for Lead", so every review check accepts all three names.
+const reviewStageNames = ["Waiting for Review", "Review", "Waiting for Lead"];
 
 /**
  * Blocks the request when the caller may not change this task and answers with
@@ -204,10 +207,10 @@ router.patch("/:id/status", async (req, res) => {
 
     const { stage_name } = req.body;
 
-    if (!["In Progress", "Waiting for Review", "Completed"].includes(stage_name)) {
+    if (!["To Do", "In Progress", "Waiting for Review", "Completed"].includes(stage_name)) {
       return res.status(400).json({
         success: false,
-        message: "Team Members can only move assigned tasks through In Progress, Waiting for Review, and Completed",
+        message: "Team Members can only move assigned tasks through To Do, In Progress, Waiting for Review, and Completed",
       });
     }
 
@@ -239,10 +242,14 @@ router.patch("/:id/status", async (req, res) => {
     );
     const currentStageName = currentStageResult.rows[0]?.name ?? "";
 
+    // Assignees walk the flow forward one stage at a time and may also send a
+    // task back to any earlier stage while it is not Completed yet.
     const allowedTransitions: Record<string, string[]> = {
       "To Do": ["In Progress"],
-      "In Progress": ["Waiting for Review"],
-      "Waiting for Review": ["Completed"],
+      "In Progress": ["To Do", "Waiting for Review"],
+      "Review": ["To Do", "In Progress", "Completed"],
+      "Waiting for Lead": ["To Do", "In Progress", "Completed"],
+      "Waiting for Review": ["To Do", "In Progress", "Completed"],
     };
 
     const allowedNextStages = allowedTransitions[currentStageName] ?? [];
@@ -251,7 +258,7 @@ router.patch("/:id/status", async (req, res) => {
       await client.query("ROLLBACK");
       return res.status(400).json({
         success: false,
-        message: "Task must follow: To Do -> In Progress -> Waiting for Review -> Completed",
+        message: "Task must follow: To Do -> In Progress -> Waiting for Review -> Completed, and can only move back to an earlier stage before it is Completed",
       });
     }
 
@@ -276,7 +283,7 @@ router.patch("/:id/status", async (req, res) => {
         });
       }
     }
-    const stageLookupNames = stage_name === "Waiting for Review" ? ["Waiting for Review", "Review", "Waiting for Lead"] : [stage_name];
+    const stageLookupNames = stage_name === "Waiting for Review" ? reviewStageNames : [stage_name];
 
     const stageResult = await client.query(
       `SELECT id, name
@@ -312,7 +319,7 @@ router.patch("/:id/status", async (req, res) => {
         task.id,
         req.user.id,
         "task_status_updated_by_assignee",
-        JSON.stringify({ stage_name }),
+        JSON.stringify({ stage_name, previous_stage_name: currentStageName }),
       ],
     );
 console.log("WAITING REVIEW NOTIFICATION TRIGGERED", task.id, task.created_by);
@@ -324,6 +331,20 @@ console.log("WAITING REVIEW NOTIFICATION TRIGGERED", task.id, task.created_by);
           task.created_by,
           task.id,
           `Task "${task.title}" is waiting for your review.`,
+        ],
+      );
+    }
+
+    // The assignee pulled the task back out of review, so the reviewer should
+    // know the pending review request no longer applies.
+    if (reviewStageNames.includes(currentStageName) && stage_name !== "Completed") {
+      await client.query(
+        `INSERT INTO notifications (user_id, task_id, type, title, message)
+         VALUES ($1, $2, 'task_review_withdrawn', 'Task moved back from review', $3)`,
+        [
+          task.created_by,
+          task.id,
+          `Task "${task.title}" was moved back to ${stage_name} and is no longer waiting for your review.`,
         ],
       );
     }

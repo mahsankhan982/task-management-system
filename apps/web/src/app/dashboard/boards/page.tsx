@@ -79,6 +79,19 @@ const priorityBorderClass: Record<Priority, string> = {
   Low: "border-l-green-400",
 };
 
+// Older boards still label the review column "Review" or "Waiting for Lead".
+function normalizeStageName(name: string) {
+  return ["Review", "Waiting for Lead"].includes(name) ? "Waiting for Review" : name;
+}
+
+// Stages an assignee may drag their task into, per stage it sits in now. The
+// flow moves forward one step at a time and back to any earlier stage.
+const assigneeStageMoves: Record<string, string[]> = {
+  "To Do": ["In Progress"],
+  "In Progress": ["To Do", "Waiting for Review"],
+  "Waiting for Review": ["To Do", "In Progress", "Completed"],
+};
+
 export default function BoardsPage() {
   const searchParams = useSearchParams();
   const requestedBoardId = Number(searchParams.get("boardId"));
@@ -274,7 +287,7 @@ export default function BoardsPage() {
     const task = tasks.find((item) => item.id === taskId);
     const targetStage = boardWorkflow.find((stage) => stage.id === stageId);
     if (!task || !targetStage) return;
-    const targetStageName = ["Review", "Waiting for Lead"].includes(targetStage.name) ? "Waiting for Review" : targetStage.name;
+    const targetStageName = normalizeStageName(targetStage.name);
 
     // Team Members drag their own tasks freely; on a task somebody else
     // created they are limited to the status flow of tasks assigned to them.
@@ -283,8 +296,8 @@ export default function BoardsPage() {
     if (followsStatusFlow) {
       const assignedToMe = task.assignees?.some((a) => Number(a.id) === Number(user.id));
       if (!assignedToMe) { setError("You can only move tasks you created or that are assigned to you"); return; }
-      const allowedNextStage: Record<string, string> = { "To Do": "In Progress", "In Progress": "Waiting for Review", "Waiting for Review": "Completed" };
-      if (allowedNextStage[task.stage_name] !== targetStageName) {
+      const allowedMoves = assigneeStageMoves[normalizeStageName(task.stage_name)] ?? [];
+      if (!allowedMoves.includes(targetStageName)) {
         setError("");
         return;
       }
