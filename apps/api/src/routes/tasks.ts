@@ -214,7 +214,7 @@ router.patch("/:id/status", async (req, res) => {
     await client.query("BEGIN");
 
     const taskResult = await client.query(
-      `SELECT t.id, t.board_id, t.stage_id, t.title, t.updated_at
+      `SELECT t.id, t.board_id, t.stage_id, t.title, t.updated_at, t.created_by
        FROM tasks t
        JOIN task_assignees ta ON ta.task_id = t.id
        WHERE t.id = $1 AND ta.user_id = $2
@@ -315,6 +315,7 @@ router.patch("/:id/status", async (req, res) => {
         JSON.stringify({ stage_name }),
       ],
     );
+console.log("WAITING REVIEW NOTIFICATION TRIGGERED", task.id, task.created_by);
     if (stage_name === "Waiting for Review") {
       await client.query(
         `INSERT INTO notifications (user_id, task_id, type, title, message)
