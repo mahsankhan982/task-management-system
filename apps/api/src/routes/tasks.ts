@@ -136,6 +136,23 @@ router.post("/", async (req, res) => {
 
     await client.query("BEGIN");
 
+    // Completed is a Team Lead / Manager / Coordinator decision, so a Team
+    // Member cannot drop a brand new task straight into it either.
+    if (req.user!.role === "Team Member") {
+      const targetStage = await client.query(
+        "SELECT name FROM workflow_stages WHERE id = $1 LIMIT 1",
+        [stage_id],
+      );
+
+      if (targetStage.rows[0]?.name === "Completed") {
+        await client.query("ROLLBACK");
+        return res.status(403).json({
+          success: false,
+          message: "Only a Team Lead, Manager or Coordinator can put a task in Completed",
+        });
+      }
+    }
+
     const result = await client.query(
       "INSERT INTO tasks (board_id, stage_id, title, description, priority, due_date, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
       [board_id, stage_id, title.trim(), description ?? null, taskPriority, due_date ?? null, req.user!.id]
@@ -207,10 +224,10 @@ router.patch("/:id/status", async (req, res) => {
 
     const { stage_name } = req.body;
 
-    if (!["To Do", "In Progress", "Waiting for Review", "Completed"].includes(stage_name)) {
+    if (!["To Do", "In Progress", "Waiting for Review"].includes(stage_name)) {
       return res.status(400).json({
         success: false,
-        message: "Team Members can only move assigned tasks through To Do, In Progress, Waiting for Review, and Completed",
+        message: "Team Members can only move assigned tasks through To Do, In Progress and Waiting for Review. Only a Team Lead, Manager or Coordinator can move a task to Completed",
       });
     }
 
@@ -242,14 +259,15 @@ router.patch("/:id/status", async (req, res) => {
     );
     const currentStageName = currentStageResult.rows[0]?.name ?? "";
 
-    // Assignees walk the flow forward one stage at a time and may also send a
-    // task back to any earlier stage while it is not Completed yet.
+    // Assignees walk the flow forward one stage at a time and may send a task
+    // back to any earlier stage. Completing a task is reserved for Team Leads,
+    // Managers and Coordinators, so the flow stops at Waiting for Review.
     const allowedTransitions: Record<string, string[]> = {
       "To Do": ["In Progress"],
       "In Progress": ["To Do", "Waiting for Review"],
-      "Review": ["To Do", "In Progress", "Completed"],
-      "Waiting for Lead": ["To Do", "In Progress", "Completed"],
-      "Waiting for Review": ["To Do", "In Progress", "Completed"],
+      "Review": ["To Do", "In Progress"],
+      "Waiting for Lead": ["To Do", "In Progress"],
+      "Waiting for Review": ["To Do", "In Progress"],
     };
 
     const allowedNextStages = allowedTransitions[currentStageName] ?? [];
@@ -258,31 +276,10 @@ router.patch("/:id/status", async (req, res) => {
       await client.query("ROLLBACK");
       return res.status(400).json({
         success: false,
-        message: "Task must follow: To Do -> In Progress -> Waiting for Review -> Completed, and can only move back to an earlier stage before it is Completed",
+        message: "Task must follow: To Do -> In Progress -> Waiting for Review, and can move back to any earlier stage. A Team Lead, Manager or Coordinator marks it Completed",
       });
     }
 
-    if (stage_name === "Completed") {
-      const leadReply = await client.query(
-        `SELECT c.id
-         FROM comments c
-         JOIN users u ON u.id = c.user_id
-         WHERE c.task_id = $1
-           AND u.role = 'Team Lead'
-           AND c.created_at >= $2
-         ORDER BY c.created_at DESC
-         LIMIT 1`,
-        [task.id, task.updated_at],
-      );
-
-      if (!leadReply.rows[0]) {
-        await client.query("ROLLBACK");
-        return res.status(400).json({
-          success: false,
-          message: "A Team Lead must reply after the task enters Waiting for Review before it can be completed",
-        });
-      }
-    }
     const stageLookupNames = stage_name === "Waiting for Review" ? reviewStageNames : [stage_name];
 
     const stageResult = await client.query(
@@ -337,7 +334,7 @@ console.log("WAITING REVIEW NOTIFICATION TRIGGERED", task.id, task.created_by);
 
     // The assignee pulled the task back out of review, so the reviewer should
     // know the pending review request no longer applies.
-    if (reviewStageNames.includes(currentStageName) && stage_name !== "Completed") {
+    if (reviewStageNames.includes(currentStageName)) {
       await client.query(
         `INSERT INTO notifications (user_id, task_id, type, title, message)
          VALUES ($1, $2, 'task_review_withdrawn', 'Task moved back from review', $3)`,
@@ -530,6 +527,22 @@ router.patch("/:id", async (req, res) => {
     if (!previousTask) {
       await client.query('ROLLBACK');
       return res.status(404).json({ success: false, message: 'Task not found' });
+    }
+
+    // Team Members never set a stage directly, not even on tasks they created:
+    // their moves go through PATCH /:id/status, which keeps them on assigned
+    // tasks and stops at Waiting for Review.
+    if (
+      req.user!.role === "Team Member" &&
+      stage_id !== undefined &&
+      stage_id !== null &&
+      Number(stage_id) !== Number(previousTask.stage_id)
+    ) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({
+        success: false,
+        message: "Team Members can only move tasks assigned to them, through To Do, In Progress and Waiting for Review. Only a Team Lead, Manager or Coordinator can move a task to Completed",
+      });
     }
 
     const result = await client.query(

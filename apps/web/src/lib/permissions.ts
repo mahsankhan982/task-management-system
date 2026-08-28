@@ -64,7 +64,11 @@ export function isTaskCreator(
  * Permissions for one specific task. Team Members may create tasks and assign
  * them to anyone, but a task raised by somebody else stays read-only for them:
  * they can still comment, and move it through the status flow when it is
- * assigned to them. Everyone above Team Member keeps their role permissions.
+ * assigned to them. Moving a task is never free-form for a Team Member — even
+ * on tasks they created they only walk the To Do -> In Progress -> Waiting for
+ * Review flow on tasks assigned to them, so `moveTask` stays false and the
+ * status flow handles those moves. Everyone above Team Member keeps their role
+ * permissions.
  */
 export function getTaskPermissions(
   role: UserRole,
@@ -83,7 +87,7 @@ export function getTaskPermissions(
     ...base,
     editTask: owns,
     assignTask: owns,
-    moveTask: owns,
+    moveTask: false,
     deleteTask: owns,
   };
 }

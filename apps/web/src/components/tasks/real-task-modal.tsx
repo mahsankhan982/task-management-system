@@ -133,15 +133,15 @@ type Props = {
 const priorities: Priority[] = ["Critical", "High", "Medium", "Low"];
 const modalCoreStageNames = ["To Do", "In Progress", "Waiting for Review", "Review", "Completed"] as const;
 
-type AssigneeStage = "To Do" | "In Progress" | "Waiting for Review" | "Completed";
+type AssigneeStage = "To Do" | "In Progress" | "Waiting for Review";
 
 // Older boards still label the review column "Review" or "Waiting for Lead".
 function normalizeStageName(name: string | null | undefined) {
   return name === "Review" || name === "Waiting for Lead" ? "Waiting for Review" : name ?? "";
 }
 
-// Earlier stages an assignee may send the task back to. Available until the
-// task is Completed, which only a Team Lead can undo.
+// Earlier stages an assignee may send the task back to. The flow ends at
+// Waiting for Review, so Completed never appears here.
 const backwardStagesByStage: Record<string, AssigneeStage[]> = {
   "In Progress": ["To Do"],
   "Waiting for Review": ["In Progress", "To Do"],
@@ -299,12 +299,14 @@ export default function RealTaskModal({
 
   const currentStageName = normalizeStageName(task?.stage_name);
 
-  // Only an assigned Team Member drives the status flow, so the move-back
-  // control stays hidden for everyone else.
+  // Only an assigned Team Member drives the status flow; every other role moves
+  // tasks through the stage field instead.
+  const isStatusFlowUser = role === "Team Member" && isAssignedToMe;
+
   const backwardStages = useMemo<AssigneeStage[]>(() => {
-    if (role !== "Team Member" || !isAssignedToMe) return [];
+    if (!isStatusFlowUser) return [];
     return backwardStagesByStage[currentStageName] ?? [];
-  }, [currentStageName, role, isAssignedToMe]);
+  }, [currentStageName, isStatusFlowUser]);
 
   // A Team Member only edits tasks they created; every other role keeps the
   // permissions of its role. Falls back to no-edit while the task loads.
@@ -366,7 +368,9 @@ export default function RealTaskModal({
             description: description.trim() || null,
             priority,
             due_date: dueDate || null,
-            stage_id: stageId || task.stage_id,
+            // Only roles that may move tasks send a stage; a Team Member's
+            // moves go through the status flow instead.
+            ...(permissions.moveTask ? { stage_id: stageId || task.stage_id } : {}),
           }),
         });
       }
@@ -394,7 +398,7 @@ export default function RealTaskModal({
   }
 
   async function updateMyTaskStatus(stageName: AssigneeStage) {
-    if (false || !task || !isAssignedToMe) return;
+    if (false || !task || !isStatusFlowUser) return;
 
     try {
       setStatusUpdating(true);
@@ -413,6 +417,40 @@ export default function RealTaskModal({
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Unable to update task status",
+      );
+    } finally {
+      setStatusUpdating(false);
+    }
+  }
+
+  // Completing a task belongs to the Team Lead, Manager and Coordinator roles,
+  // so it sets the stage directly instead of using the assignee status flow.
+  async function completeTask() {
+    const completedStage = workflow.find((stage) => stage.name === "Completed");
+
+    if (!task || !permissions.moveTask) return;
+
+    if (!completedStage) {
+      setError("This board has no Completed stage");
+      return;
+    }
+
+    try {
+      setStatusUpdating(true);
+      setError("");
+
+      await apiRequest(`/tasks/${taskId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          stage_id: completedStage.id,
+        }),
+      });
+
+      await loadTask();
+      await onChanged?.();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Unable to complete task",
       );
     } finally {
       setStatusUpdating(false);
@@ -837,21 +875,9 @@ export default function RealTaskModal({
                   <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
                     Completed
                   </span>
-                ) : currentStageName === "Waiting for Review" ? (
-                  <button
-                    type="button"
-                    onClick={() => void updateMyTaskStatus("Completed")}
-                    disabled={statusUpdating}
-                    className="flex h-9 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
-                  >
-                    {statusUpdating ? (
-                      <Loader2 size={15} className="animate-spin" />
-                    ) : (
-                      <CheckSquare size={15} />
-                    )}
-                    {statusUpdating ? "Updating..." : "Mark Complete"}
-                  </button>
-                ) : currentStageName === "In Progress" ? (
+                ) : null}
+
+                {isStatusFlowUser && currentStageName === "In Progress" ? (
                   <button
                     type="button"
                     onClick={() => void updateMyTaskStatus("Waiting for Review")}
@@ -865,7 +891,9 @@ export default function RealTaskModal({
                     )}
                     {statusUpdating ? "Updating..." : "Send for Review"}
                   </button>
-                ) : currentStageName === "To Do" ? (
+                ) : null}
+
+                {isStatusFlowUser && currentStageName === "To Do" ? (
                   <button
                     type="button"
                     onClick={() => void updateMyTaskStatus("In Progress")}
@@ -878,6 +906,23 @@ export default function RealTaskModal({
                       <Activity size={15} />
                     )}
                     {statusUpdating ? "Updating..." : "Start Work"}
+                  </button>
+                ) : null}
+
+                {/* Reserved for Team Leads, Managers and Coordinators. */}
+                {permissions.moveTask && currentStageName !== "Completed" ? (
+                  <button
+                    type="button"
+                    onClick={() => void completeTask()}
+                    disabled={statusUpdating}
+                    className="flex h-9 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    {statusUpdating ? (
+                      <Loader2 size={15} className="animate-spin" />
+                    ) : (
+                      <CheckSquare size={15} />
+                    )}
+                    {statusUpdating ? "Updating..." : "Mark Complete"}
                   </button>
                 ) : null}
               </>

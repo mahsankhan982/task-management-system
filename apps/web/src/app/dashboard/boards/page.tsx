@@ -86,11 +86,16 @@ function normalizeStageName(name: string) {
 
 // Stages an assignee may drag their task into, per stage it sits in now. The
 // flow moves forward one step at a time and back to any earlier stage.
+// Completed is missing on purpose: only a Team Lead, Manager or Coordinator
+// puts a task there.
 const assigneeStageMoves: Record<string, string[]> = {
   "To Do": ["In Progress"],
   "In Progress": ["To Do", "Waiting for Review"],
-  "Waiting for Review": ["To Do", "In Progress", "Completed"],
+  "Waiting for Review": ["To Do", "In Progress"],
 };
+
+const COMPLETED_BY_LEAD_MESSAGE =
+  "Only a Team Lead, Manager or Coordinator can move a task to Completed";
 
 export default function BoardsPage() {
   const searchParams = useSearchParams();
@@ -269,6 +274,16 @@ export default function BoardsPage() {
     }>;
   }, [boardWorkflow]);
 
+  // A Team Member cannot put a task in Completed, so the create form does not
+  // offer it to them.
+  const creatableWorkflow = useMemo(
+    () =>
+      role === "Team Member"
+        ? displayWorkflow.filter((stage) => stage.name !== "Completed")
+        : displayWorkflow,
+    [displayWorkflow, role],
+  );
+
 
   const boardTasks = useMemo(() => {
     const clean = query.trim().toLowerCase();
@@ -289,13 +304,14 @@ export default function BoardsPage() {
     if (!task || !targetStage) return;
     const targetStageName = normalizeStageName(targetStage.name);
 
-    // Team Members drag their own tasks freely; on a task somebody else
-    // created they are limited to the status flow of tasks assigned to them.
-    const followsStatusFlow = role === "Team Member" && !isTaskCreator(user.id, task.created_by);
+    // Team Members only ever move tasks assigned to them, and only through the
+    // status flow, whether or not they created the task.
+    const followsStatusFlow = role === "Team Member";
 
     if (followsStatusFlow) {
       const assignedToMe = task.assignees?.some((a) => Number(a.id) === Number(user.id));
-      if (!assignedToMe) { setError("You can only move tasks you created or that are assigned to you"); return; }
+      if (!assignedToMe) { setError("You can only move tasks that are assigned to you"); return; }
+      if (targetStageName === "Completed") { setError(COMPLETED_BY_LEAD_MESSAGE); return; }
       const allowedMoves = assigneeStageMoves[normalizeStageName(task.stage_name)] ?? [];
       if (!allowedMoves.includes(targetStageName)) {
         setError("");
@@ -320,7 +336,7 @@ export default function BoardsPage() {
   function handleDragStart(event: DragEvent<HTMLElement>, taskId: number) {
     const task = tasks.find((item) => item.id === taskId);
     if (!task) { event.preventDefault(); return; }
-    if (role === "Team Member" && !isTaskCreator(user.id, task.created_by)) {
+    if (role === "Team Member") {
       const assignedToMe = task.assignees?.some((a) => Number(a.id) === Number(user.id));
       if (!assignedToMe) { event.preventDefault(); return; }
     } else if (!permissions.moveTask) { event.preventDefault(); return; }
@@ -570,10 +586,10 @@ export default function BoardsPage() {
             </select>
             <select
               name="stage_id"
-              defaultValue={String(displayWorkflow[0]?.id ?? "")}
+              defaultValue={String(creatableWorkflow[0]?.id ?? "")}
               className="h-11 rounded-xl border px-3 text-sm"
             >
-              {displayWorkflow.map((stage) => (
+              {creatableWorkflow.map((stage) => (
                 <option key={stage.id} value={stage.id}>
                   {stage.name}
                 </option>
@@ -638,8 +654,7 @@ export default function BoardsPage() {
                           key={task.id}
                           draggable={
                             role === "Team Member"
-                              ? isTaskCreator(user.id, task.created_by) ||
-                                Boolean(task.assignees?.some((a) => Number(a.id) === Number(user.id)))
+                              ? Boolean(task.assignees?.some((a) => Number(a.id) === Number(user.id)))
                               : permissions.moveTask
                           }
                           onClick={() => {
