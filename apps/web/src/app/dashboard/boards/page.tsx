@@ -679,7 +679,7 @@ export default function BoardsPage() {
                           }}
                           onDragStart={(event) => handleDragStart(event, task.id)}
                           onDragEnd={() => setDraggedTaskId(null)}
-                          className={`cursor-pointer rounded-lg border border-slate-200 border-l-4 bg-white p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md ${priorityBorderClass[task.priority]} ${isOverdue(task) ? "border-red-500 bg-red-50" : ""}`}
+                          className={`cursor-pointer rounded-lg border border-l-4 p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md ${priorityBorderClass[task.priority]} ${isOverdue(task) ? "border-red-500 bg-red-50" : "border-slate-200 bg-white"}`}
                         >
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span
