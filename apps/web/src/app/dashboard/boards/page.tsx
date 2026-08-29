@@ -98,6 +98,15 @@ const COMPLETED_BY_LEAD_MESSAGE =
   "Only a Team Lead, Manager or Coordinator can move a task to Completed";
 
 export default function BoardsPage() {
+  const isOverdue = (task:any) => {
+    if (!task.due_date) return false;
+    if (task.stage_name === "Completed") return false;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const due = new Date(task.due_date);
+    due.setHours(0,0,0,0);
+    return due <= today;
+  };
   const searchParams = useSearchParams();
   const requestedBoardId = Number(searchParams.get("boardId"));
 
@@ -670,7 +679,7 @@ export default function BoardsPage() {
                           }}
                           onDragStart={(event) => handleDragStart(event, task.id)}
                           onDragEnd={() => setDraggedTaskId(null)}
-                          className={`cursor-pointer rounded-lg border border-slate-200 border-l-4 bg-white p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md ${priorityBorderClass[task.priority]}`}
+                          className={`cursor-pointer rounded-lg border border-slate-200 border-l-4 bg-white p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md ${priorityBorderClass[task.priority]} ${isOverdue(task) ? "border-red-500 bg-red-50" : ""}`}
                         >
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span
