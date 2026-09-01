@@ -1,9 +1,21 @@
 import app from "./app";
+import http from "http";
+import { Server } from "socket.io";
+import { registerCalling } from "./calling";
 import { env } from "./config/env";
 
 const startServer = (): void => {
+  const httpServer = http.createServer(app);
+  const io = new Server(httpServer, {
+    cors: {
+      origin: env.CLIENT_URL,
+      credentials: true,
+    },
+  });
+
+  registerCalling(io);
   try {
-    app.listen(env.PORT, () => {
+    httpServer.listen(env.PORT, () => {
       console.log("");
       console.log("========================================");
       console.log(" Task Management API");
