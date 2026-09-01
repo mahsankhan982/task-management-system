@@ -133,6 +133,14 @@ export default function TopHeader() {
   useEffect(() => {
     void Promise.resolve().then(() => loadNotifications());
 
+    const notificationTimer = window.setInterval(() => {
+      void loadNotifications();
+    }, 10000);
+
+    return () => {
+      window.clearInterval(notificationTimer);
+    };
+
     const timer = window.setInterval(() => {
       void loadNotifications();
     }, 15000);
