@@ -123,15 +123,41 @@ export default function TopHeader() {
         unread_count: number;
       }>("/notifications");
 
-      setNotifications(response.data ?? []);
+      const incoming = response.data ?? [];
+      const currentIds = new Set(incoming.map((item) => String(item.id)));
+
+      if (notificationsInitialized.current) {
+        const freshNotifications = incoming.filter((item) => !item.is_read && !lastNotificationIds.current.has(String(item.id)));
+
+        if (freshNotifications.length > 0) {
+          playNotificationSound();
+
+          if ("Notification" in window && Notification.permission === "granted") {
+            const latest = freshNotifications[0];
+            new Notification(latest.title || "New notification", {
+              body: latest.message || "You have a new notification.",
+              tag: String(latest.id),
+            });
+          }
+        }
+      } else {
+        notificationsInitialized.current = true;
+      }
+
+      lastNotificationIds.current = currentIds;
+      setNotifications(incoming);
       setUnreadCount(Number(response.unread_count ?? 0));
     } catch {
-      // Keep header usable even if notifications temporarily fail.
+      // Keep header usable if notifications temporarily fail.
     }
-  }, []);
+  }, [playNotificationSound]);
 
   useEffect(() => {
-    void Promise.resolve().then(() => loadNotifications());
+    if ("Notification" in window && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
+
+    void loadNotifications();
 
     const notificationTimer = window.setInterval(() => {
       void loadNotifications();
@@ -140,12 +166,6 @@ export default function TopHeader() {
     return () => {
       window.clearInterval(notificationTimer);
     };
-
-    const timer = window.setInterval(() => {
-      void loadNotifications();
-    }, 15000);
-
-    return () => window.clearInterval(timer);
   }, [loadNotifications]);
 
   async function markRead(id: NotificationItem["id"]) {
