@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import {
   CalendarDays,
@@ -527,7 +527,7 @@ export default function BoardsPage() {
               {selectedBoard?.name ?? "Boards"}
             </h1>
             <p className="mt-1 text-xs text-white/70">
-              {selectedBoard?.team_name ?? "No team"} Ã‚Â· PostgreSQL data
+              {selectedBoard?.team_name ?? "No team"} Ãƒâ€šÃ‚Â· PostgreSQL data
             </p>
           </div>
 
@@ -642,6 +642,15 @@ export default function BoardsPage() {
             placeholder="Search tasks..."
             className="h-11 w-full bg-transparent px-3 text-sm outline-none"
           />
+
+          <div className="mb-3 flex items-center rounded-lg border border-white/30 bg-white/95 px-3 shadow-sm">
+            <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className="h-11 w-full bg-transparent px-3 text-sm font-medium text-slate-700 outline-none">
+              <option value="">All Employees / Assignees</option>
+              {assigneeOptions.map(([id, name]) => (
+                <option key={id} value={String(id)}>{name}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {boards.length === 0 ? (
@@ -797,6 +806,7 @@ export default function BoardsPage() {
     </div>
   );
 }
+
 
 
 
