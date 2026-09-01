@@ -98,16 +98,17 @@ const COMPLETED_BY_LEAD_MESSAGE =
   "Only a Team Lead, Manager or Coordinator can move a task to Completed";
 
 export default function BoardsPage() {
-  const isOverdue = (task:any) => {
-    if (!task.due_date) return false;
-    if (task.stage_name === "Completed") return false;
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const due = new Date(task.due_date);
-    due.setHours(0,0,0,0);
-    return due <= today;
+  const getDueState = (task: Task) => {
+    if (!task.due_date || task.stage_name === "Completed") return "normal";
+    const due = String(task.due_date).slice(0, 10);
+    const now = new Date();
+    const today = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+    if (due < today) return "overdue";
+    if (due === today) return "today";
+    return "normal";
   };
-  const searchParams = useSearchParams();
+
+    const searchParams = useSearchParams();
   const requestedBoardId = Number(searchParams.get("boardId"));
 
   const { permissions, role, user } = useRole();
@@ -679,7 +680,7 @@ export default function BoardsPage() {
                           }}
                           onDragStart={(event) => handleDragStart(event, task.id)}
                           onDragEnd={() => setDraggedTaskId(null)}
-                          className={`cursor-pointer rounded-lg border border-l-4 p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md ${priorityBorderClass[task.priority]} ${isOverdue(task) ? "border-red-500 bg-red-50" : "border-slate-200 bg-white"}`}
+                          className={`cursor-pointer rounded-lg border border-l-4 p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md ${priorityBorderClass[task.priority]} ${getDueState(task) === "overdue" ? "!border-red-500 !bg-red-50" : getDueState(task) === "today" ? "!border-yellow-500 !bg-yellow-50" : "border-slate-200 bg-white"}`}
                         >
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span
