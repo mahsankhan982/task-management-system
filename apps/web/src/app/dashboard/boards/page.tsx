@@ -119,6 +119,7 @@ export default function BoardsPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -295,10 +296,21 @@ export default function BoardsPage() {
   );
 
 
+  const assigneeOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    tasks.forEach((task) => {
+      task.assignees?.forEach((assignee) => {
+        map.set(Number(assignee.id), assignee.full_name);
+      });
+    });
+    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [tasks]);
+
   const boardTasks = useMemo(() => {
     const clean = query.trim().toLowerCase();
     return tasks.filter((task) => {
       if (task.board_id !== selectedBoardId) return false;
+      if (assigneeFilter && !task.assignees?.some((a) => String(a.id) === assigneeFilter)) return false;
       if (!clean) return true;
       return (
         task.title.toLowerCase().includes(clean) ||
@@ -306,7 +318,7 @@ export default function BoardsPage() {
         task.stage_name.toLowerCase().includes(clean)
       );
     });
-  }, [tasks, selectedBoardId, query]);
+  }, [tasks, selectedBoardId, query, assigneeFilter]);
 
   async function moveTask(taskId: number, stageId: number) {
     const task = tasks.find((item) => item.id === taskId);
