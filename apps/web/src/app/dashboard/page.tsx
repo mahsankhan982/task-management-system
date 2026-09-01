@@ -60,7 +60,7 @@ const workspaces = [
 
 export default function DashboardPage() {
   const { role } = useRole();
-  const canJoinEmployee = role === "Manager";
+  const canJoinEmployee = role === "Manager" || role === "Team Lead";
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);

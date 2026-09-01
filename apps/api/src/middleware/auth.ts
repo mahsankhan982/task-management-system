@@ -136,10 +136,10 @@ export function requireManagerWrites(req: Request, res: Response, next: NextFunc
     return next();
   }
 
-  if (req.user?.role !== "Manager") {
+  if (req.user?.role !== "Manager" && req.user?.role !== "Team Lead") {
     return res.status(403).json({
       success: false,
-      message: "Only Managers can manage teams and users",
+      message: "Only Managers and Team Leads can manage teams and users",
     });
   }
 
