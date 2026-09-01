@@ -90,16 +90,18 @@ export default function TopHeader() {
       const gain = ctx.createGain();
       oscillator.type = "sine";
       oscillator.frequency.setValueAtTime(880, ctx.currentTime);
-      oscillator.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.18);
+      oscillator.frequency.setValueAtTime(660, ctx.currentTime + 0.12);
       gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
+      gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
       oscillator.connect(gain);
       gain.connect(ctx.destination);
       oscillator.start();
-      oscillator.stop(ctx.currentTime + 0.26);
-      oscillator.onended=()=>{void ctx.close();};
-    } catch {}
+      oscillator.stop(ctx.currentTime + 0.31);
+      oscillator.onended = () => { void ctx.close(); };
+    } catch (error) {
+      console.warn("Notification sound could not play", error);
+    }
   }, []);
 
   useEffect(() => {
