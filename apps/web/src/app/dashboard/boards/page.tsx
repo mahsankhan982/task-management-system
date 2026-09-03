@@ -744,8 +744,8 @@ export default function BoardsPage() {
                                       <div title={a.full_name} className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">
                                         {a.full_name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase()}
                                       </div>
-                                      <button type="button" onClick={(event) => { event.stopPropagation(); console.log("VOICE CALL CLICKED", Number(a.id)); window.dispatchEvent(new CustomEvent("taskmanager:start-call", { detail: { targetUserId: Number(a.id), type: "audio" } })); }} className="rounded-full p-1 text-slate-500 hover:bg-green-100 hover:text-green-600" title={"Voice call " + a.full_name}><Phone size={13} /></button>
-                                      <button type="button" onClick={(event) => { event.stopPropagation(); console.log("VIDEO CALL CLICKED", Number(a.id)); window.dispatchEvent(new CustomEvent("taskmanager:start-call", { detail: { targetUserId: Number(a.id), type: "video" } })); }} className="rounded-full p-1 text-slate-500 hover:bg-blue-100 hover:text-blue-600" title={"Video call " + a.full_name}><Video size={13} /></button>
+                                      {false && (<><button type="button" onClick={(event) => { event.stopPropagation(); console.log("VOICE CALL CLICKED", Number(a.id)); window.dispatchEvent(new CustomEvent("taskmanager:start-call", { detail: { targetUserId: Number(a.id), type: "audio" } })); }} className="rounded-full p-1 text-slate-500 hover:bg-green-100 hover:text-green-600" title={"Voice call " + a.full_name}><Phone size={13} /></button>
+                                      <button type="button" onClick={(event) => { event.stopPropagation(); console.log("VIDEO CALL CLICKED", Number(a.id)); window.dispatchEvent(new CustomEvent("taskmanager:start-call", { detail: { targetUserId: Number(a.id), type: "video" } })); }} className="rounded-full p-1 text-slate-500 hover:bg-blue-100 hover:text-blue-600" title={"Video call " + a.full_name}><Video size={13} /></button></>)}
                                     </div>
                                   ))}
                                 </div>
@@ -808,6 +808,8 @@ export default function BoardsPage() {
     </div>
   );
 }
+
+
 
 
 
