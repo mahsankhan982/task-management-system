@@ -98,12 +98,12 @@ export default function CallManager() {
         const fromUserId = Number(data.fromUserId);
         const callId = String(data.callId);
         const peer = createPeerConnection(
-          (candidate) => socket.emit("webrtc:ice-candidate", { targetUserId: fromUserId, callId, candidate }),
-          (stream) => {
+          (candidate: RTCIceCandidate) => socket.emit("webrtc:ice-candidate", { targetUserId: fromUserId, callId, candidate }),
+          (stream: MediaStream) => {
             remoteStreamRef.current = stream;
             if (remoteVideoRef.current) remoteVideoRef.current.srcObject = stream;
           },
-          (state) => {
+          (state: RTCPeerConnectionState) => {
             if (state === "connected") setCallState("connected");
           }
         );
@@ -122,9 +122,7 @@ export default function CallManager() {
 
     const handleAnswer = async (data: any) => {
       try {
-        if (peerConnectionRef.current) {
-          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
-        }
+        if (peerConnectionRef.current) await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
       } catch (error) {
         console.error("WebRTC answer error:", error);
       }
@@ -132,9 +130,7 @@ export default function CallManager() {
 
     const handleIceCandidate = async (data: any) => {
       try {
-        if (peerConnectionRef.current && data.candidate) {
-          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
-        }
+        if (peerConnectionRef.current && data.candidate) await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
       } catch (error) {
         console.error("WebRTC ICE error:", error);
       }
@@ -149,7 +145,7 @@ export default function CallManager() {
       socket.off("webrtc:answer", handleAnswer);
       socket.off("webrtc:ice-candidate", handleIceCandidate);
     };
-  }, []);
+  }, [callState]);
 
   const acceptCall = useCallback(async () => {
     if (!incomingCall || !socketRef.current) return;
@@ -215,6 +211,17 @@ export default function CallManager() {
     setIncomingCall(null);
     setCallState("idle");
   }, [incomingCall]);
+
+  useEffect(() => {
+    const handleStartCall = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {};
+      const targetUserId = Number(detail.targetUserId);
+      const type = detail.type === "audio" ? "audio" : "video";
+      if (targetUserId) void startCall(targetUserId, type);
+    };
+    window.addEventListener("taskmanager:start-call", handleStartCall);
+    return () => window.removeEventListener("taskmanager:start-call", handleStartCall);
+  }, [startCall]);
 
   const toggleMute = () => {
     const next = !muted;
