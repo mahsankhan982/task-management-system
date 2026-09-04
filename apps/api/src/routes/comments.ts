@@ -10,6 +10,75 @@ import {
 const router = Router();
 
 
+// GET ALL TASK CONVERSATIONS WITH ONE EMPLOYEE
+router.get("/conversation/:userId", async(req,res)=>{
+  try{
+    const selectedUserId = Number(req.params.userId);
+
+    if(!Number.isInteger(selectedUserId) || selectedUserId <= 0){
+      return res.status(400).json({ success:false, message:"Invalid employee" });
+    }
+
+    const userResult = await db.query(
+      "SELECT id,full_name,email,role FROM users WHERE id=$1 AND is_active=TRUE",
+      [selectedUserId]
+    );
+
+    if(!userResult.rows[0]){
+      return res.status(404).json({ success:false, message:"Employee not found" });
+    }
+
+    const messagesResult = await db.query(
+      `WITH employee_tasks AS (
+         SELECT DISTINCT task_id
+         FROM comments
+         WHERE user_id=$2
+       )
+       SELECT c.*,
+              u.full_name AS user_name,
+              u.role AS user_role,
+              t.title AS task_title
+       FROM comments c
+       JOIN employee_tasks et ON et.task_id=c.task_id
+       JOIN tasks t ON t.id=c.task_id
+       LEFT JOIN users u ON u.id=c.user_id
+       WHERE c.user_id IN ($1,$2)
+         AND NOT EXISTS (
+           SELECT 1
+           FROM comment_hidden_users chu
+           WHERE chu.comment_id=c.id
+             AND chu.user_id=$1
+         )
+       ORDER BY c.created_at ASC
+       LIMIT 500`,
+      [req.user!.id, selectedUserId]
+    );
+
+    const tasksResult = await db.query(
+      `SELECT DISTINCT t.id,t.title
+       FROM tasks t
+       JOIN comments c ON c.task_id=t.id
+       WHERE c.user_id=$1
+       ORDER BY t.title`,
+      [selectedUserId]
+    );
+
+    return res.json({
+      success:true,
+      data:messagesResult.rows,
+      tasks:tasksResult.rows,
+      employee:userResult.rows[0],
+    });
+  }catch(error){
+    console.error("Get employee task conversation failed:",error);
+    return res.status(500).json({
+      success:false,
+      message:"Unable to fetch employee conversation",
+    });
+  }
+});
+
+
 // GET COMMENTS
 router.get("/task/:taskId", async (req, res) => {
   try {
@@ -22,8 +91,14 @@ router.get("/task/:taskId", async (req, res) => {
        FROM comments c
        LEFT JOIN users u ON u.id = c.user_id
        WHERE c.task_id = $1
+         AND NOT EXISTS (
+           SELECT 1
+           FROM comment_hidden_users chu
+           WHERE chu.comment_id = c.id
+             AND chu.user_id = $2
+         )
        ORDER BY c.created_at ASC`,
-      [taskId]
+      [taskId, req.user!.id]
     );
 
     return res.json({
@@ -230,7 +305,8 @@ router.patch("/:id", async(req,res)=>{
             t.created_by AS task_created_by
      FROM comments c
      JOIN tasks t ON t.id=c.task_id
-     WHERE c.id=$1`,
+     WHERE c.id=$1
+       AND c.deleted_at IS NULL`,
     [id]
   );
 
@@ -331,6 +407,129 @@ router.patch("/:id", async(req,res)=>{
     message:"Unable to edit comment",
   });
 
+
+ }finally{
+
+  client.release();
+
+ }
+
+});
+
+
+// DELETE COMMENT FOR CURRENT USER ONLY
+router.delete("/:id/me", async(req,res)=>{
+
+ try{
+
+  const {id}=req.params;
+
+  const commentResult = await db.query(
+    "SELECT id FROM comments WHERE id=$1",
+    [id]
+  );
+
+  if(!commentResult.rows[0]){
+
+    return res.status(404).json({
+      success:false,
+      message:"Comment not found",
+    });
+
+  }
+
+  await db.query(
+    `INSERT INTO comment_hidden_users(comment_id,user_id)
+     VALUES($1,$2)
+     ON CONFLICT(comment_id,user_id) DO NOTHING`,
+    [id, req.user!.id]
+  );
+
+  return res.json({ success:true });
+
+ }catch(error){
+
+  console.error("Delete comment for user failed:",error);
+
+  return res.status(500).json({
+    success:false,
+    message:"Unable to delete message for you",
+  });
+
+ }
+
+});
+
+
+// SOFT DELETE COMMENT
+router.delete("/:id", async(req,res)=>{
+
+ const client = await db.connect();
+
+ try{
+
+  const {id}=req.params;
+
+  await client.query("BEGIN");
+
+  const commentResult = await client.query(
+    `SELECT id,user_id,deleted_at
+     FROM comments
+     WHERE id=$1
+     FOR UPDATE`,
+    [id]
+  );
+
+  const comment = commentResult.rows[0];
+
+  if(!comment){
+
+    await client.query("ROLLBACK");
+
+    return res.status(404).json({
+      success:false,
+      message:"Comment not found",
+    });
+
+  }
+
+  if(Number(comment.user_id)!==req.user!.id){
+
+    await client.query("ROLLBACK");
+
+    return res.status(403).json({
+      success:false,
+      message:"You can only delete your own messages",
+    });
+
+  }
+
+  const result = await client.query(
+    `UPDATE comments
+     SET deleted_at=COALESCE(deleted_at,NOW()),
+         updated_at=CASE WHEN deleted_at IS NULL THEN NOW() ELSE updated_at END
+     WHERE id=$1
+     RETURNING *`,
+    [id]
+  );
+
+  await client.query("COMMIT");
+
+  return res.json({
+    success:true,
+    data:result.rows[0],
+  });
+
+ }catch(error){
+
+  await client.query("ROLLBACK");
+
+  console.error("Delete comment failed:",error);
+
+  return res.status(500).json({
+    success:false,
+    message:"Unable to delete comment",
+  });
 
  }finally{
 

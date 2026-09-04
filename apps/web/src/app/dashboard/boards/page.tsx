@@ -110,8 +110,9 @@ export default function BoardsPage() {
     return "normal";
   };
 
-    const searchParams = useSearchParams();
+  const searchParams = useSearchParams();
   const requestedBoardId = Number(searchParams.get("boardId"));
+  const requestedTaskId = Number(searchParams.get("task"));
 
   const { permissions, role, user } = useRole();
   const canManageBoards = role !== "Team Member";
@@ -183,7 +184,21 @@ export default function BoardsPage() {
       setTasks(nextTasks);
       setWorkflow(nextWorkflow);
 
+      const requestedTask =
+        Number.isFinite(requestedTaskId) && requestedTaskId > 0
+          ? nextTasks.find((task) => Number(task.id) === requestedTaskId)
+          : undefined;
+
       setSelectedBoardId((current) => {
+        if (
+          requestedTask &&
+          nextBoards.some(
+            (board) => Number(board.id) === Number(requestedTask.board_id),
+          )
+        ) {
+          return Number(requestedTask.board_id);
+        }
+
         if (
           Number.isFinite(requestedBoardId) &&
           requestedBoardId > 0 &&
@@ -198,6 +213,11 @@ export default function BoardsPage() {
 
         return nextBoards[0]?.id ?? null;
       });
+
+      if (requestedTask) {
+        setSelectedTaskInitialEdit(false);
+        setSelectedTaskId(Number(requestedTask.id));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load board data");
     } finally {
@@ -207,7 +227,7 @@ export default function BoardsPage() {
 
   useEffect(() => {
     void Promise.resolve().then(() => loadData());
-  }, [requestedBoardId]);
+  }, [requestedBoardId, requestedTaskId]);
 
   const selectedBoard = boards.find((board) => board.id === selectedBoardId);
 
@@ -517,9 +537,9 @@ export default function BoardsPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-gradient-to-br from-[#64499a] via-[#a85dbd] to-[#d46bb6] p-3 md:p-4">
+    <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-gradient-to-br from-[#64499a] via-[#a85dbd] to-[#d46bb6] p-3 md:p-4">
       <BoardNavPanels boards={boards} selectedBoardId={selectedBoardId} onSelectBoard={(id) => setSelectedBoardId(id)} />
-      <div className="mx-auto max-w-none">
+      <div className="mx-auto flex min-h-0 w-full flex-1 flex-col max-w-none">
         <div className="mb-3 flex flex-col gap-3 rounded-xl border border-white/10 bg-[#5b3f88]/95 p-3 text-white shadow-lg backdrop-blur lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-200">
@@ -660,8 +680,8 @@ export default function BoardsPage() {
             No boards found in the database.
           </div>
         ) : (
-          <div className="min-h-[calc(100vh-13rem)] overflow-x-auto rounded-xl bg-black/10 p-2 pb-4">
-            <div className="flex min-w-max items-start gap-3">
+          <div className="min-h-0 flex-1 overflow-x-auto rounded-xl bg-black/10 p-2 pb-4">
+            <div className="flex h-full min-w-max items-stretch gap-3">
               {displayWorkflow.map((stage) => {
                 const Icon = stageIcons[stage.name as keyof typeof stageIcons] ?? CircleDot;
                 const stageTasks = boardTasks.filter((task) => stage.stageIds.includes(Number(task.stage_id)));
@@ -681,14 +701,14 @@ export default function BoardsPage() {
                       if (taskId) moveTask(taskId, stage.id);
                       setDraggedTaskId(null);
                     }}
-                    className="w-[285px] shrink-0 rounded-xl bg-[#f1f2f4] p-2.5 shadow-sm"
+                    className="flex h-full max-h-full w-[285px] shrink-0 flex-col rounded-xl bg-[#f1f2f4] p-2.5 shadow-sm"
                   >
                     <div className="mb-2.5 flex items-center gap-2 px-1">
                       <Icon size={16} className="text-slate-600" />
                       <h2 className="text-sm font-semibold text-slate-800">{stage.name} ({stageTasks.length})</h2>
                     </div>
 
-                    <div className="max-h-[285px] space-y-3 overflow-y-auto pr-1">
+                    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
                       {stageTasks.map((task) => (
                         <article
                           key={task.id}
@@ -744,8 +764,8 @@ export default function BoardsPage() {
                                       <div title={a.full_name} className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">
                                         {a.full_name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase()}
                                       </div>
-                                      {false && (<><button type="button" onClick={(event) => { event.stopPropagation(); console.log("VOICE CALL CLICKED", Number(a.id)); window.dispatchEvent(new CustomEvent("taskmanager:start-call", { detail: { targetUserId: Number(a.id), type: "audio" } })); }} className="rounded-full p-1 text-slate-500 hover:bg-green-100 hover:text-green-600" title={"Voice call " + a.full_name}><Phone size={13} /></button>
-                                      <button type="button" onClick={(event) => { event.stopPropagation(); console.log("VIDEO CALL CLICKED", Number(a.id)); window.dispatchEvent(new CustomEvent("taskmanager:start-call", { detail: { targetUserId: Number(a.id), type: "video" } })); }} className="rounded-full p-1 text-slate-500 hover:bg-blue-100 hover:text-blue-600" title={"Video call " + a.full_name}><Video size={13} /></button></>)}
+                                      <button type="button" onClick={(event) => { event.stopPropagation(); console.log("VOICE CALL CLICKED", Number(a.id)); window.dispatchEvent(new CustomEvent("taskmanager:start-call", { detail: { targetUserId: Number(a.id), type: "audio" } })); }} className="rounded-full p-1 text-slate-500 hover:bg-green-100 hover:text-green-600" title={"Voice call " + a.full_name}><Phone size={13} /></button>
+                                      <button type="button" onClick={(event) => { event.stopPropagation(); console.log("VIDEO CALL CLICKED", Number(a.id)); window.dispatchEvent(new CustomEvent("taskmanager:start-call", { detail: { targetUserId: Number(a.id), type: "video" } })); }} className="rounded-full p-1 text-slate-500 hover:bg-blue-100 hover:text-blue-600" title={"Video call " + a.full_name}><Video size={13} /></button>
                                     </div>
                                   ))}
                                 </div>
@@ -808,8 +828,6 @@ export default function BoardsPage() {
     </div>
   );
 }
-
-
 
 
 

@@ -1,9 +1,10 @@
 "use client";
 
-import type { FormEvent } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
+  ArrowLeft,
   CheckSquare,
   Download,
   FileText,
@@ -16,6 +17,8 @@ import {
   Pencil,
   Plus,
   Save,
+  Search,
+  Send,
   Trash2,
   Undo2,
   Upload,
@@ -26,6 +29,7 @@ import {
 import { apiBlobRequest, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
 import { getTaskPermissions, isTaskCreator } from "@/lib/permissions";
+import ChakorLogo from "@/components/brand/chakor-logo";
 
 function AuthImage({ attachmentId, alt, className }: { attachmentId: Id, alt: string, className?: string }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -77,11 +81,20 @@ type ChecklistItem = {
 
 type TaskComment = {
   id: Id;
+  user_id: Id | null;
   user_name: string | null;
   user_role?: string | null;
   body: string;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
+  task_id?: Id;
+  task_title?: string;
+};
+
+type ConversationTask = {
+  id: Id;
+  title: string;
 };
 
 type ActivityEntry = { details?: any;
@@ -215,6 +228,40 @@ export default function RealTaskModal({
   const [previewImageTitle, setPreviewImageTitle] = useState<string>("");
   const [editingCommentId, setEditingCommentId] = useState<Id | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState("");
+  const [openMessageMenuId, setOpenMessageMenuId] = useState<Id | null>(null);
+  const [employeeSearchOpen, setEmployeeSearchOpen] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [selectedChatUser, setSelectedChatUser] = useState<UserOption | null>(null);
+  const [conversationComments, setConversationComments] = useState<TaskComment[]>([]);
+  const [conversationTasks, setConversationTasks] = useState<ConversationTask[]>([]);
+  const [replyTaskId, setReplyTaskId] = useState("");
+  const [conversationLoading, setConversationLoading] = useState(false);
+  const commentFormRef = useRef<HTMLFormElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  const loadEmployeeConversation = useCallback(async (employee: UserOption) => {
+    try {
+      setConversationLoading(true);
+      setError("");
+      const response = await apiRequest<{
+        success: boolean;
+        data: TaskComment[];
+        tasks: ConversationTask[];
+      }>(`/comments/conversation/${employee.id}`);
+
+      setConversationComments(response.data ?? []);
+      setConversationTasks(response.tasks ?? []);
+      setReplyTaskId((current) => {
+        if ((response.tasks ?? []).some((item) => String(item.id) === current)) return current;
+        const currentTask = (response.tasks ?? []).find((item) => String(item.id) === String(taskId));
+        return String(currentTask?.id ?? response.tasks?.[0]?.id ?? "");
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load employee conversation");
+    } finally {
+      setConversationLoading(false);
+    }
+  }, [taskId]);
 
   const loadTask = useCallback(async (syncForm = true) => {
     try {
@@ -293,6 +340,25 @@ export default function RealTaskModal({
   useEffect(() => {
     void Promise.resolve().then(() => loadAttachments());
   }, [loadAttachments]);
+
+  useEffect(() => {
+    const chat = chatScrollRef.current;
+    if (!chat) return;
+
+    chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
+  }, [task?.comments, conversationComments]);
+
+  const searchedEmployees = useMemo(() => {
+    const query = employeeSearch.trim().toLowerCase();
+    return users
+      .filter((entry) => Number(entry.id) !== Number(user.id))
+      .filter((entry) =>
+        !query || entry.full_name.toLowerCase().includes(query) || entry.email.toLowerCase().includes(query)
+      )
+      .slice(0, 8);
+  }, [employeeSearch, user.id, users]);
+
+  const visibleComments = selectedChatUser ? conversationComments : task?.comments ?? [];
 
   const selectedAssignees = useMemo(
     () => users.filter((user) => assigneeIds.includes(String(user.id))),
@@ -761,7 +827,8 @@ export default function RealTaskModal({
   async function addComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const body = comment.trim();
-    if (!body || !permissions.comment) return;
+    const targetTaskId = selectedChatUser ? replyTaskId : String(taskId);
+    if (!body || !permissions.comment || !targetTaskId) return;
 
     try {
       setPosting(true);
@@ -769,7 +836,7 @@ export default function RealTaskModal({
       await apiRequest("/comments", {
         method: "POST",
         body: JSON.stringify({
-          task_id: taskId,
+          task_id: targetTaskId,
           body,
           mention_ids: mentionedUserIds
             .map(Number)
@@ -779,6 +846,7 @@ export default function RealTaskModal({
       setComment("");
       setMentionedUserIds([]);
       await loadTask(false);
+      if (selectedChatUser) await loadEmployeeConversation(selectedChatUser);
       await onChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to add comment");
@@ -795,7 +863,7 @@ export default function RealTaskModal({
     // Only names that were not already there are sent, otherwise fixing a typo
     // would notify the same people again.
     const original =
-      task?.comments.find((entry) => String(entry.id) === String(commentId))?.body ?? "";
+      visibleComments.find((entry) => String(entry.id) === String(commentId))?.body ?? "";
     const alreadyMentioned = findMentionedIds(original, users);
     const newMentions = findMentionedIds(body, users).filter(
       (id) => !alreadyMentioned.includes(id),
@@ -811,6 +879,7 @@ export default function RealTaskModal({
       setEditingCommentId(null);
       setEditingCommentBody("");
       await loadTask(false);
+      if (selectedChatUser) await loadEmployeeConversation(selectedChatUser);
       await onChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to edit comment");
@@ -819,8 +888,60 @@ export default function RealTaskModal({
     }
   }
 
+  async function deleteComment(commentId: Id) {
+    try {
+      setPosting(true);
+      setError("");
+      setOpenMessageMenuId(null);
+      await apiRequest(`/comments/${commentId}`, { method: "DELETE" });
+      if (String(editingCommentId) === String(commentId)) {
+        setEditingCommentId(null);
+        setEditingCommentBody("");
+      }
+      await loadTask(false);
+      if (selectedChatUser) await loadEmployeeConversation(selectedChatUser);
+      await onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete message");
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  async function deleteCommentForMe(commentId: Id) {
+    try {
+      setPosting(true);
+      setError("");
+      setOpenMessageMenuId(null);
+      await apiRequest(`/comments/${commentId}/me`, { method: "DELETE" });
+      await loadTask(false);
+      if (selectedChatUser) await loadEmployeeConversation(selectedChatUser);
+      await onChanged?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete message for you");
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  async function copyComment(body: string) {
+    try {
+      await navigator.clipboard.writeText(body);
+      setOpenMessageMenuId(null);
+    } catch {
+      setError("Unable to copy message");
+    }
+  }
+
+  function handleCommentKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+
+    event.preventDefault();
+    commentFormRef.current?.requestSubmit();
+  }
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-md sm:p-5">
       <button
         type="button"
         aria-label="Close task details"
@@ -828,29 +949,33 @@ export default function RealTaskModal({
         className="absolute inset-0"
       />
 
-      <div className="relative z-10 max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
-        <div className="sticky top-0 z-20 flex items-start justify-between border-b bg-white px-6 py-5">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-wider text-violet-600">
-              Task Details
-            </p>
-            <h2 className="mt-1 truncate text-xl font-semibold text-slate-950">
-              {task?.title ?? "Loading task..."}
-            </h2>
-
-            {task ? (
-              <p className="mt-1 truncate text-xs text-slate-500">
-                Created by{" "}
-                <span className="font-semibold text-slate-700">
-                  {isMyTask ? "you" : task.created_by_name ?? "Unknown"}
-                </span>
-                {!permissions.editTask && role === "Team Member" ? (
-                  <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                    View only
-                  </span>
-                ) : null}
+      <div className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-violet-100 bg-slate-50 shadow-[0_28px_80px_-24px_rgba(22,31,69,0.7)]">
+        <div className="h-1 shrink-0 bg-gradient-to-r from-[#161f45] via-violet-600 to-sky-500" />
+        <div className="z-20 flex shrink-0 items-start justify-between border-b border-violet-100 bg-gradient-to-r from-white via-violet-50/40 to-sky-50/70 px-5 py-4 sm:px-7">
+          <div className="flex min-w-0 flex-1 items-center gap-3.5">
+            <ChakorLogo size={42} rounded="rounded-xl" priority className="ring-4 ring-white shadow-md" />
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-600">
+                Chakor Task Management
               </p>
-            ) : null}
+              <h2 className="mt-1 truncate text-xl font-bold tracking-tight text-[#161f45]">
+                {task?.title ?? "Loading task..."}
+              </h2>
+
+              {task ? (
+                <p className="mt-1 truncate text-xs text-slate-500">
+                  Created by{" "}
+                  <span className="font-semibold text-slate-700">
+                    {isMyTask ? "you" : task.created_by_name ?? "Unknown"}
+                  </span>
+                  {!permissions.editTask && role === "Team Member" ? (
+                    <span className="ml-2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-violet-700 shadow-sm ring-1 ring-violet-100">
+                      View only
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <div className="ml-4 flex items-center gap-2">
@@ -1029,8 +1154,8 @@ export default function RealTaskModal({
         ) : error && !task ? (
           <div className="p-8 text-sm text-red-600">{error}</div>
         ) : task ? (
-          <div className="grid lg:grid-cols-[1.25fr_.75fr]">
-            <section className="p-6">
+          <div className="min-h-0 flex-1 gap-3 overflow-y-auto bg-gradient-to-br from-[#5c3d8c] via-[#914eaa] to-[#c55bb5] p-3 lg:grid lg:grid-cols-[1.3fr_.7fr]">
+            <section className="rounded-2xl border border-white/50 bg-gradient-to-br from-white via-white to-violet-50/60 p-5 shadow-xl shadow-violet-950/15 sm:p-6 lg:p-7">
               {error ? (
                 error.includes("Team Members cannot perform this action") ? (
                   <div className="mb-5 flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3.5 text-sm font-medium text-violet-800 shadow-sm">
@@ -1047,7 +1172,7 @@ export default function RealTaskModal({
               ) : null}
 
               {role === "Team Member" && !permissions.editTask ? (
-                <div className="mb-5 flex items-start gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3.5 text-sm font-medium text-violet-800 shadow-sm">
+                <div className="mb-5 flex items-start gap-2 rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-indigo-50 p-3.5 text-sm font-medium text-violet-800 shadow-sm">
                   <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600">
                     i
                   </span>
@@ -1060,25 +1185,25 @@ export default function RealTaskModal({
                 </div>
               ) : null}
 
-              <div>
-                <label className="text-xs font-semibold uppercase text-slate-400">Title</label>
+              <div className="rounded-2xl border border-violet-100 bg-violet-50/55 p-3.5 shadow-sm">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Title</label>
                 <input
                   id="task-title-input"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                   disabled={!editing || !permissions.editTask}
-                  className="mt-2 h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none focus:border-violet-500 disabled:bg-slate-50"
+                  className="mt-2 h-11 w-full rounded-xl border border-violet-200 bg-white px-3.5 text-sm font-semibold shadow-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:bg-white/70 disabled:text-slate-600"
                 />
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="text-xs font-semibold uppercase text-slate-400">
+                <label className="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-[11px] font-bold uppercase tracking-wider text-sky-700 shadow-sm">
                   Stage
                   <select
                     value={stageId}
                     onChange={(event) => setStageId(event.target.value)}
                     disabled={!editing || !permissions.moveTask}
-                    className="mt-2 h-11 w-full rounded-xl border bg-white px-3 text-sm normal-case text-slate-800 disabled:bg-slate-50"
+                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm normal-case text-slate-800 shadow-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:bg-slate-50"
                   >
                     {workflow.map((stage) => (
                       <option key={String(stage.id)} value={String(stage.id)}>
@@ -1088,13 +1213,13 @@ export default function RealTaskModal({
                   </select>
                 </label>
 
-                <label className="text-xs font-semibold uppercase text-slate-400">
+                <label className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3 text-[11px] font-bold uppercase tracking-wider text-amber-700 shadow-sm">
                   Priority
                   <select
                     value={priority}
                     onChange={(event) => setPriority(event.target.value as Priority)}
                     disabled={!editing || !permissions.editTask}
-                    className="mt-2 h-11 w-full rounded-xl border bg-white px-3 text-sm normal-case text-slate-800 disabled:bg-slate-50"
+                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm normal-case text-slate-800 shadow-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:bg-slate-50"
                   >
                     {priorities.map((item) => (
                       <option key={item}>{item}</option>
@@ -1102,38 +1227,38 @@ export default function RealTaskModal({
                   </select>
                 </label>
 
-                <div className="rounded-xl border bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase text-slate-400">Board</p>
+                <div className="rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/80 to-white p-4 shadow-sm">
+                  <p className="text-xs font-bold uppercase tracking-wider text-cyan-700">Board</p>
                   <p className="mt-2 text-sm font-semibold text-slate-900">{task.board_name}</p>
                 </div>
 
-                <label className="text-xs font-semibold uppercase text-slate-400">
+                <label className="rounded-2xl border border-rose-100 bg-rose-50/60 p-3 text-[11px] font-bold uppercase tracking-wider text-rose-700 shadow-sm">
                   Due date
                   <input
                     type="date"
                     value={dueDate}
                     onChange={(event) => setDueDate(event.target.value)}
                     disabled={!editing || !permissions.editTask}
-                    className="mt-2 h-11 w-full rounded-xl border bg-white px-3 text-sm normal-case text-slate-800 disabled:bg-slate-50"
+                    className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm normal-case text-slate-800 shadow-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:bg-slate-50"
                   />
                 </label>
               </div>
 
-              <div className="mt-6">
-                <label className="text-sm font-semibold text-slate-900">Description</label>
+              <div className="mt-5 rounded-2xl border border-indigo-100 bg-indigo-50/45 p-4 shadow-sm">
+                <label className="text-sm font-bold text-indigo-950">Description</label>
                 <textarea
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
                   disabled={!editing || !permissions.editTask}
                   rows={5}
-                  className="mt-2 w-full resize-none rounded-xl border bg-white p-4 text-sm leading-6 text-slate-700 outline-none focus:border-violet-500 disabled:bg-slate-50"
+                  className="mt-2 w-full resize-none rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700 shadow-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:bg-slate-50"
                   placeholder="No description added."
                 />
               </div>
 
-              <div className="mt-6 border-t border-slate-200 pt-6">
+              <div className="mt-6 rounded-2xl border border-fuchsia-100 bg-fuchsia-50/35 p-4 shadow-sm">
                 <div className="flex items-center gap-2">
-                  <Paperclip size={17} />
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-fuchsia-100 text-fuchsia-700"><Paperclip size={16} /></span>
                   <h3 className="text-sm font-semibold text-slate-900">
                     Attachments
                   </h3>
@@ -1317,9 +1442,9 @@ export default function RealTaskModal({
                 </div>
               </div>
 
-              <div className="mt-6">
+              <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/35 p-4 shadow-sm">
                 <div className="flex items-center gap-2">
-                  <UserRound size={17} />
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700"><UserRound size={16} /></span>
                   <h3 className="text-sm font-semibold text-slate-900">Assignees</h3>
                 </div>
 
@@ -1405,9 +1530,9 @@ export default function RealTaskModal({
                 ) : null}
               </div>
 
-              <div className="mt-6">
+              <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/35 p-4 shadow-sm">
                 <div className="flex items-center gap-2">
-                  <CheckSquare size={17} />
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700"><CheckSquare size={16} /></span>
                   <h3 className="text-sm font-semibold text-slate-900">Checklist</h3>
                 </div>
 
@@ -1493,140 +1618,312 @@ export default function RealTaskModal({
               </div>
             </section>
 
-            <aside className="border-t bg-slate-50 p-6 lg:border-l lg:border-t-0">
-              <div className="flex items-center gap-2">
-                <MessageSquare size={17} />
-                <h3 className="text-sm font-semibold text-slate-900">Comments</h3>
-              </div>
-
-              <form onSubmit={addComment} className="mt-4">
-                <textarea
-                  value={comment}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    setComment(value);
-                    if (!value.includes("@")) setMentionedUserIds([]);
-                  }}
-                  disabled={!permissions.comment || posting}
-                  rows={3}
-                  placeholder="Write a comment..."
-                  className="w-full resize-none rounded-xl border bg-white px-3 py-3 text-sm outline-none focus:border-violet-500 disabled:bg-slate-100"
-                />
-
-                {mentionSuggestions.length > 0 ? (
-                  <div className="mt-1 overflow-hidden rounded-xl border border-violet-200 bg-white shadow-lg">
-                    <div className="border-b bg-violet-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-violet-700">
-                      Mention employee
-                    </div>
-
-                    {mentionSuggestions.map((user) => (
-                      <button
-                        key={String(user.id)}
-                        type="button"
-                        onClick={() => insertMention(user)}
-                        className="flex w-full items-center justify-between gap-3 border-b px-3 py-2.5 text-left last:border-b-0 hover:bg-slate-50"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-slate-900">
-                            {user.full_name}
-                          </span>
-                          <span className="block truncate text-xs text-slate-500">
-                            {user.email}
-                          </span>
-                        </span>
-
-                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
-                          {user.role}
-                        </span>
-                      </button>
-                    ))}
+            <aside className="rounded-2xl border border-white/55 bg-gradient-to-b from-violet-50/95 via-white to-sky-50/95 p-4 shadow-xl shadow-violet-950/15 sm:p-5">
+              <div className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-[0_12px_32px_-20px_rgba(76,29,149,0.45)]">
+                <div className="relative flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
+                  {selectedChatUser ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedChatUser(null);
+                        setConversationComments([]);
+                        setConversationTasks([]);
+                        setReplyTaskId("");
+                      }}
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-violet-50 hover:text-violet-700"
+                      aria-label="Back to current task conversation"
+                    >
+                      <ArrowLeft size={16} />
+                    </button>
+                  ) : (
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-violet-700">
+                    <MessageSquare size={16} />
+                  </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-sm font-semibold text-slate-900">
+                      {selectedChatUser ? selectedChatUser.full_name : "Task conversation"}
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      {selectedChatUser ? "All shared task chats" : `${visibleComments.length} messages`}
+                    </p>
                   </div>
-                ) : null}
+                  <button
+                    type="button"
+                    onClick={() => setEmployeeSearchOpen((open) => !open)}
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-violet-100 bg-violet-50 text-violet-700 transition hover:bg-violet-100"
+                    aria-label="Search employee conversations"
+                    title="Search employee conversations"
+                  >
+                    <Search size={17} />
+                  </button>
 
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Type @ to mention an employee. Mentioned employees receive a notification.
-                </p>
-                <button
-                  type="submit"
-                  disabled={!permissions.comment || posting || !comment.trim()}
-                  className="mt-2 h-9 rounded-lg bg-violet-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
-                >
-                  {posting ? "Posting..." : "Comment"}
-                </button>
-              </form>
-
-              <div className="mt-5 space-y-3">
-                {task.comments.length === 0 ? (
-                  <p className="text-sm text-slate-500">No comments yet.</p>
-                ) : (
-                  task.comments.map((entry) => (
-                    <div key={String(entry.id)} className="rounded-xl border bg-white p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-semibold text-slate-900">
-                          {entry.user_name || "User"}
-                        </p>
-                        {entry.user_role ? (
-                          <span className="text-[10px] font-semibold text-violet-600">
-                            {entry.user_role}
-                          </span>
-                        ) : null}
+                  {employeeSearchOpen ? (
+                    <div className="absolute left-3 right-3 top-[calc(100%+6px)] z-40 overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-2xl">
+                      <div className="flex items-center gap-2 border-b border-slate-100 px-3 py-2.5">
+                        <Search size={15} className="text-slate-400" />
+                        <input
+                          value={employeeSearch}
+                          onChange={(event) => setEmployeeSearch(event.target.value)}
+                          autoFocus
+                          placeholder="Search employee name..."
+                          className="h-8 min-w-0 flex-1 text-sm outline-none"
+                        />
+                        <button type="button" onClick={() => setEmployeeSearchOpen(false)} className="text-slate-400 hover:text-slate-700">
+                          <X size={15} />
+                        </button>
                       </div>
-                      {editingCommentId === entry.id ? (
-                        <div className="mt-2 space-y-2">
-                          <textarea
-                            value={editingCommentBody}
-onChange={(e)=>{
-  const value = e.target.value;
-  setEditingCommentBody(value);
-  setComment(value);
-}}
-                            className="w-full rounded-lg border p-2 text-sm"
-                          />
-
+                      <div className="max-h-60 overflow-y-auto p-1.5">
+                        {searchedEmployees.length === 0 ? (
+                          <p className="px-3 py-4 text-center text-xs text-slate-500">No employee found.</p>
+                        ) : searchedEmployees.map((employee) => (
                           <button
-                            type="button"
-                            onClick={() => saveEditComment(entry.id)}
-                            className="text-xs font-semibold text-green-600"
-                          >
-                            Save
-                          </button>
-
-                          <button
+                            key={String(employee.id)}
                             type="button"
                             onClick={() => {
-                              setEditingCommentId(null);
-                              setEditingCommentBody("");
+                              setSelectedChatUser(employee);
+                              setEmployeeSearchOpen(false);
+                              setEmployeeSearch("");
+                              void loadEmployeeConversation(employee);
                             }}
-                            className="ml-3 text-xs font-semibold text-red-600"
+                            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-violet-50"
                           >
-                            Cancel
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-700 text-xs font-bold text-white">
+                              {employee.full_name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-sm font-semibold text-slate-800">{employee.full_name}</span>
+                              <span className="block truncate text-[11px] text-slate-500">{employee.role} · {employee.email}</span>
+                            </span>
                           </button>
-                        </div>
-                      ) : (
-                        <>
-                          <p className="mt-2 text-sm text-slate-700">{entry.body}</p>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
 
-                          {entry.user_name === user.full_name ? (
+                <div
+                  ref={chatScrollRef}
+                  className="h-[270px] space-y-2 overflow-y-auto scroll-smooth bg-gradient-to-b from-violet-50/50 via-slate-50 to-sky-50/60 px-3 py-3"
+                  onClick={() => setOpenMessageMenuId(null)}
+                >
+                {conversationLoading ? (
+                  <div className="flex h-full items-center justify-center gap-2 text-sm text-violet-700">
+                    <Loader2 size={17} className="animate-spin" /> Loading conversation...
+                  </div>
+                ) : visibleComments.length === 0 ? (
+                  <div className="flex h-full items-center justify-center">
+                    <p className="rounded-full bg-white/80 px-4 py-2 text-xs text-slate-500 shadow-sm">
+                      No messages yet. Start the conversation.
+                    </p>
+                  </div>
+                ) : (
+                  visibleComments.map((entry) => {
+                    const isMine = Number(entry.user_id) === Number(user.id);
+                    const isDeleted = Boolean(entry.deleted_at);
+                    const wasEdited = !isDeleted && new Date(entry.updated_at).getTime() > new Date(entry.created_at).getTime();
+                    const menuIsOpen = String(openMessageMenuId) === String(entry.id);
+
+                    return (
+                    <div key={String(entry.id)} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                      <div className="relative flex max-w-[92%] items-start gap-1">
+                      <div
+                        className={`relative rounded-xl border px-3 py-2 shadow-sm ${
+                          isMine
+                            ? "border-violet-200 bg-gradient-to-br from-violet-100 to-indigo-50 text-slate-800"
+                            : "border-slate-200 bg-white text-slate-800"
+                        }`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (!isDeleted) setOpenMessageMenuId(menuIsOpen ? null : entry.id);
+                        }}
+                      >
+                        {!isMine && !isDeleted ? (
+                          <p className="mb-1 text-xs font-semibold text-emerald-700">
+                            {entry.user_name || "User"}
+                          </p>
+                        ) : null}
+                        {selectedChatUser && entry.task_title ? (
+                          <p className="mb-1 inline-flex max-w-full rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold text-slate-500">
+                            Task: {entry.task_title}
+                          </p>
+                        ) : null}
+
+                      {String(editingCommentId) === String(entry.id) && !isDeleted ? (
+                        <div className="min-w-60 space-y-2" onClick={(event) => event.stopPropagation()}>
+                          <textarea
+                            value={editingCommentBody}
+                            onChange={(event) => setEditingCommentBody(event.target.value)}
+                            rows={3}
+                            autoFocus
+                            className="w-full resize-none rounded-xl border border-emerald-300 bg-white p-2 text-sm outline-none focus:ring-2 focus:ring-emerald-200"
+                          />
+                          <div className="flex justify-end gap-2">
                             <button
                               type="button"
                               onClick={() => {
-                                setEditingCommentId(entry.id);
-                                setEditingCommentBody(entry.body);
-                                setComment(entry.body);
+                                setEditingCommentId(null);
+                                setEditingCommentBody("");
                               }}
-                              className="mt-2 text-xs font-semibold text-blue-600 hover:underline"
+                              className="rounded-lg px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
                             >
-                              Edit
+                              Cancel
                             </button>
-                          ) : null}
+                            <button
+                              type="button"
+                              disabled={posting || !editingCommentBody.trim()}
+                              onClick={() => void saveEditComment(entry.id)}
+                              className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white disabled:opacity-50"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className={`whitespace-pre-wrap break-words text-sm ${isDeleted ? "italic text-slate-500" : ""}`}>
+                            {isDeleted ? "This message was deleted" : entry.body}
+                          </p>
+                          <div className="mt-1 flex items-center justify-end gap-1.5 text-[10px] text-slate-500">
+                            {wasEdited ? <span>Edited</span> : null}
+                            <time dateTime={entry.created_at}>
+                              {new Date(entry.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </time>
+                          </div>
                         </>
                       )}
-                      <p className="mt-2 text-[11px] text-slate-400">
-                        {formatDate(entry.created_at)}
-                      </p>
+
+                      {menuIsOpen && !isDeleted ? (
+                        <div
+                          className={`absolute top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border bg-white py-1 shadow-xl ${isMine ? "right-0" : "left-0"}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {isMine ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingCommentId(entry.id);
+                                  setEditingCommentBody(entry.body);
+                                  setOpenMessageMenuId(null);
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-slate-50"
+                              >
+                                <Pencil size={13} /> Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void deleteComment(entry.id)}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 size={13} /> Delete for everyone
+                              </button>
+                            </>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => void deleteCommentForMe(entry.id)}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50"
+                          >
+                            <Trash2 size={13} /> Delete for me
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void copyComment(entry.body)}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-slate-50"
+                          >
+                            <FileText size={13} /> Copy
+                          </button>
+                        </div>
+                      ) : null}
+                      </div>
+                      {!isDeleted ? (
+                        <button
+                          type="button"
+                          aria-label="Message actions"
+                          title="Message actions"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenMessageMenuId(menuIsOpen ? null : entry.id);
+                          }}
+                          className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-white hover:text-slate-800"
+                        >
+                          <MoreHorizontal size={17} />
+                        </button>
+                      ) : null}
+                      </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
+                </div>
+
+                <form ref={commentFormRef} onSubmit={addComment} className="relative border-t border-violet-100 bg-white p-3">
+                  {mentionSuggestions.length > 0 ? (
+                    <div className="absolute bottom-full left-3 right-3 z-30 mb-1 max-h-56 overflow-y-auto rounded-xl border border-emerald-200 bg-white shadow-xl">
+                      <div className="border-b bg-emerald-50 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                        Mention employee
+                      </div>
+                      {mentionSuggestions.map((mentionUser) => (
+                        <button
+                          key={String(mentionUser.id)}
+                          type="button"
+                          onClick={() => insertMention(mentionUser)}
+                          className="flex w-full items-center justify-between gap-3 border-b px-3 py-2.5 text-left last:border-b-0 hover:bg-slate-50"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-slate-900">{mentionUser.full_name}</span>
+                            <span className="block truncate text-xs text-slate-500">{mentionUser.email}</span>
+                          </span>
+                          <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">{mentionUser.role}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {selectedChatUser ? (
+                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-wider text-violet-700">
+                      Reply in task
+                      <select
+                        value={replyTaskId}
+                        onChange={(event) => setReplyTaskId(event.target.value)}
+                        className="mt-1 h-9 w-full rounded-xl border border-violet-200 bg-violet-50 px-3 text-xs font-semibold normal-case text-slate-700 outline-none focus:border-violet-400"
+                      >
+                        {conversationTasks.length === 0 ? <option value="">No shared task available</option> : null}
+                        {conversationTasks.map((conversationTask) => (
+                          <option key={String(conversationTask.id)} value={String(conversationTask.id)}>
+                            {conversationTask.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      value={comment}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setComment(value);
+                        if (!value.includes("@")) setMentionedUserIds([]);
+                      }}
+                      onKeyDown={handleCommentKeyDown}
+                      disabled={!permissions.comment || posting}
+                      rows={2}
+                      placeholder={selectedChatUser ? `Reply to ${selectedChatUser.full_name}...` : "Type a message... Use @ to mention"}
+                      className="max-h-32 min-h-12 flex-1 resize-none rounded-3xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-100"
+                    />
+                    <button
+                      type="submit"
+                      aria-label="Send message"
+                      disabled={!permissions.comment || posting || !comment.trim() || Boolean(selectedChatUser && !replyTaskId)}
+                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-[#161f45] text-white shadow-lg shadow-violet-200 transition hover:scale-[1.03] hover:from-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {posting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                    </button>
+                  </div>
+                  <p className="mt-1 px-2 text-[10px] text-slate-500">Enter to send · Shift + Enter for a new line</p>
+                </form>
               </div>
 
               <div className="mt-7 border-t pt-5">
@@ -1688,19 +1985,6 @@ onChange={(e)=>{
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

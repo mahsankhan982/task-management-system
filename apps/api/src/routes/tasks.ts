@@ -99,7 +99,20 @@ router.get("/:id", async (req, res) => {
   [req.params.id]
 ),
       db.query("SELECT * FROM checklist_items WHERE task_id = $1 ORDER BY position, id", [req.params.id]),
-      db.query("SELECT c.*, u.full_name AS user_name FROM comments c LEFT JOIN users u ON u.id = c.user_id WHERE c.task_id = $1 ORDER BY c.created_at", [req.params.id]),
+      db.query(
+        `SELECT c.*, u.full_name AS user_name
+         FROM comments c
+         LEFT JOIN users u ON u.id = c.user_id
+         WHERE c.task_id = $1
+           AND NOT EXISTS (
+             SELECT 1
+             FROM comment_hidden_users chu
+             WHERE chu.comment_id = c.id
+               AND chu.user_id = $2
+           )
+         ORDER BY c.created_at`,
+        [req.params.id, req.user!.id]
+      ),
       db.query("SELECT l.* FROM task_labels tl JOIN labels l ON l.id = tl.label_id WHERE tl.task_id = $1 ORDER BY l.name", [req.params.id]),
       db.query("SELECT a.*, u.full_name AS user_name FROM activity_logs a LEFT JOIN users u ON u.id = a.user_id WHERE a.task_id = $1 ORDER BY a.created_at DESC", [req.params.id])
     ]);
@@ -879,4 +892,3 @@ router.delete("/:id", async (req, res) => {
 });
 
 export default router;
-
