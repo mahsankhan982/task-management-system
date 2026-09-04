@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import {
   CalendarDays,
@@ -6,8 +6,6 @@ import {
   CircleDot,
   Clock3,
   MessageSquare,
-  Phone,
-  Video,
   Pencil,
   Plus,
   Search,
@@ -760,12 +758,8 @@ export default function BoardsPage() {
                               {task.assignees?.length > 0 && (
                                 <div className="flex -space-x-1.5">
                                   {task.assignees.map((a) => (
-                                    <div key={a.id} className="flex items-center gap-1">
-                                      <div title={a.full_name} className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">
-                                        {a.full_name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase()}
-                                      </div>
-                                      <button type="button" onClick={(event) => { event.stopPropagation(); console.log("VOICE CALL CLICKED", Number(a.id)); window.dispatchEvent(new CustomEvent("taskmanager:start-call", { detail: { targetUserId: Number(a.id), type: "audio" } })); }} className="rounded-full p-1 text-slate-500 hover:bg-green-100 hover:text-green-600" title={"Voice call " + a.full_name}><Phone size={13} /></button>
-                                      <button type="button" onClick={(event) => { event.stopPropagation(); console.log("VIDEO CALL CLICKED", Number(a.id)); window.dispatchEvent(new CustomEvent("taskmanager:start-call", { detail: { targetUserId: Number(a.id), type: "video" } })); }} className="rounded-full p-1 text-slate-500 hover:bg-blue-100 hover:text-blue-600" title={"Video call " + a.full_name}><Video size={13} /></button>
+                                    <div key={a.id} title={a.full_name} className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600">
+                                      {a.full_name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase()}
                                     </div>
                                   ))}
                                 </div>
@@ -828,17 +822,3 @@ export default function BoardsPage() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
