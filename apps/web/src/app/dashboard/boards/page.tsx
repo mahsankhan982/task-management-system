@@ -141,6 +141,7 @@ export default function BoardsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [createStageId, setCreateStageId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
@@ -454,6 +455,7 @@ export default function BoardsPage() {
 
       formElement.reset();
       setShowCreate(false);
+      setCreateStageId(null);
       await loadData();
 
       if (result.data?.id) {
@@ -597,6 +599,16 @@ export default function BoardsPage() {
     }
   }
 
+  function toggleTaskCreator(stageId: number) {
+    if (showCreate && createStageId === stageId) {
+      setShowCreate(false);
+      setCreateStageId(null);
+      return;
+    }
+    setCreateStageId(stageId);
+    setShowCreate(true);
+  }
+
   if (loading) {
     return <div className="p-8 text-sm text-slate-500">Loading board...</div>;
   }
@@ -710,7 +722,8 @@ export default function BoardsPage() {
             </select>
             <select
               name="stage_id"
-              defaultValue={String(creatableWorkflow[0]?.id ?? "")}
+              value={String(createStageId ?? creatableWorkflow[0]?.id ?? "")}
+              onChange={(event) => setCreateStageId(Number(event.target.value))}
               className="h-11 rounded-xl border px-3 text-sm"
             >
               {creatableWorkflow.map((stage) => (
@@ -886,16 +899,15 @@ export default function BoardsPage() {
                       ) : null}
                     </div>
 
-                    {stage.name === "To Do" &&
-                    permissions.createTask &&
+                    {permissions.createTask &&
                     selectedBoardId ? (
                       <button
                         type="button"
-                        onClick={() => setShowCreate((value) => !value)}
+                        onClick={() => toggleTaskCreator(stage.id)}
                         className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white/80 px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-400 hover:bg-white hover:text-violet-700"
                       >
                         <Plus size={16} />
-                        {showCreate ? "Close Add Task" : "Add Task"}
+                        {showCreate && createStageId === stage.id ? "Close Add Task" : "Add Task"}
                       </button>
                     ) : null}
                   </section>

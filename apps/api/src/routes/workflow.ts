@@ -11,8 +11,8 @@ router.get("/", async (req, res) => {
     const hasBoard = Number.isInteger(boardId) && boardId > 0;
     const result = await db.query(
       hasBoard
-        ? "SELECT * FROM workflow_stages WHERE board_id = $1 ORDER BY position ASC"
-        : "SELECT * FROM workflow_stages ORDER BY board_id ASC, position ASC",
+        ? "SELECT * FROM workflow_stages WHERE board_id = $1 AND COALESCE(is_archived,FALSE)=FALSE ORDER BY position ASC"
+        : "SELECT * FROM workflow_stages WHERE COALESCE(is_archived,FALSE)=FALSE ORDER BY board_id ASC, position ASC",
       hasBoard ? [boardId] : []
     );
     return res.status(200).json({ success: true, data: result.rows });
@@ -86,55 +86,50 @@ router.patch("/:id", async (req, res) => {
 });
 
 router.delete("/:id", async (req, res) => {
-  const client = await db.connect();
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ success: false, message: "Valid list id is required" });
     }
 
-    await client.query("BEGIN");
-    const stage = await client.query(
-      "SELECT id,board_id,name,position,created_by,is_system FROM workflow_stages WHERE id=$1 FOR UPDATE",
+    const stage = await db.query(
+      "SELECT id,board_id,name,position,created_by,is_system,is_archived FROM workflow_stages WHERE id=$1",
       [id]
     );
     if (!stage.rows[0]) {
-      await client.query("ROLLBACK");
       return res.status(404).json({ success: false, message: "List not found" });
     }
 
+    if (stage.rows[0].is_archived) {
+      return res.status(200).json({ success: true, message: "List already deleted" });
+    }
+
     if (stage.rows[0].is_system) {
-      await client.query("ROLLBACK");
       return res.status(403).json({ success: false, message: "Permanent lists cannot be deleted" });
     }
     if (!listCreatorRoles.has(req.user!.role)) {
-      await client.query("ROLLBACK");
       return res.status(403).json({ success: false, message: "Only a Team Lead, Coordinator or Manager can delete custom lists" });
     }
 
-    const taskCount = await client.query("SELECT COUNT(*)::int AS count FROM tasks WHERE stage_id=$1", [id]);
+    const taskCount = await db.query("SELECT COUNT(*)::int AS count FROM tasks WHERE stage_id=$1", [id]);
     if (taskCount.rows[0].count > 0) {
-      await client.query("ROLLBACK");
       return res.status(409).json({
         success: false,
         message: "Move or delete all tasks from this list before deleting it"
       });
     }
 
-    const { board_id, position } = stage.rows[0];
-    await client.query("DELETE FROM workflow_stages WHERE id=$1", [id]);
-    await client.query(
-      "UPDATE workflow_stages SET position=position-1 WHERE board_id=$1 AND position>$2",
-      [board_id, position]
+    await db.query(
+      `UPDATE workflow_stages
+       SET is_archived=TRUE,
+           name=LEFT(name, 70) || ' [deleted-' || id || ']'
+       WHERE id=$1`,
+      [id]
     );
-    await client.query("COMMIT");
     return res.status(200).json({ success: true, message: "List deleted" });
   } catch (error) {
-    await client.query("ROLLBACK");
     console.error("Delete workflow list failed:", error);
     return res.status(500).json({ success: false, message: "Unable to delete list" });
-  } finally {
-    client.release();
   }
 });
 
