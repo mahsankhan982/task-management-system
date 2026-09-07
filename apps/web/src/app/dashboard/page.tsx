@@ -5,6 +5,9 @@ import {
   Code2,
   Megaphone,
   Palette,
+  Pencil,
+  Plus,
+  Trash2,
   UserPlus,
   Waypoints,
   X,
@@ -27,6 +30,10 @@ type Board = {
   id: number;
   name: string;
   team_name: string | null;
+  description?: string | null;
+  team_id?: number | null;
+  created_by?: number | null;
+  is_system?: boolean;
 };
 
 type Role = "Coordinator" | "Team Lead" | "Team Member";
@@ -61,6 +68,7 @@ const workspaces = [
 export default function DashboardPage() {
   const { role } = useRole();
   const canJoinEmployee = role === "Manager" || role === "Team Lead";
+  const canManageBoards = ["Manager", "Admin", "Coordinator", "Team Lead"].includes(role);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
@@ -84,7 +92,7 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!canJoinEmployee) return;
+    if (!canJoinEmployee && !canManageBoards) return;
 
     void Promise.resolve().then(async () => {
       try {
@@ -97,7 +105,56 @@ export default function DashboardPage() {
         setTeams([]);
       }
     });
-  }, [canJoinEmployee]);
+  }, [canJoinEmployee, canManageBoards]);
+
+  async function createBoard() {
+    if (!canManageBoards) return;
+    const name = window.prompt("Board name:")?.trim();
+    if (!name) return;
+    const description = window.prompt("Board description (optional):")?.trim() || null;
+    const teamChoices = teams.map((team) => `${team.id}: ${team.name}`).join("\n");
+    const teamInput = window.prompt(`Enter Team ID (optional):\n\n${teamChoices}`, "")?.trim();
+    const team_id = teamInput ? Number(teamInput) : null;
+    if (teamInput && (!Number.isInteger(team_id) || !teams.some((team) => Number(team.id) === team_id))) {
+      window.alert("Invalid Team ID");
+      return;
+    }
+    try {
+      const response = (await apiRequest("/boards", {
+        method: "POST",
+        body: JSON.stringify({ name, description, team_id }),
+      })) as { data: Board };
+      setBoards((current) => [response.data, ...current]);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Unable to create board");
+    }
+  }
+
+  async function editBoard(board: Board) {
+    if (!canManageBoards || board.is_system) return;
+    const name = window.prompt("Board name:", board.name)?.trim();
+    if (!name) return;
+    const description = window.prompt("Board description:", board.description ?? "")?.trim() || null;
+    try {
+      const response = (await apiRequest(`/boards/${board.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name, description }),
+      })) as { data: Board };
+      setBoards((current) => current.map((item) => item.id === board.id ? { ...item, ...response.data } : item));
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Unable to edit board");
+    }
+  }
+
+  async function deleteBoard(board: Board) {
+    if (!canManageBoards || board.is_system || !window.confirm(`Delete board "${board.name}"?`)) return;
+    try {
+      await apiRequest(`/boards/${board.id}`, { method: "DELETE" });
+      setBoards((current) => current.filter((item) => item.id !== board.id));
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Unable to delete board");
+    }
+  }
 
   async function joinEmployee(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -172,6 +229,12 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        <div className="flex flex-wrap gap-3">
+        {canManageBoards ? (
+          <button type="button" onClick={() => void createBoard()} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-violet-700 px-5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-violet-800 hover:shadow-lg">
+            <Plus size={18} /> Add New Board
+          </button>
+        ) : null}
         {canJoinEmployee ? (
           <button
             type="button"
@@ -186,6 +249,7 @@ export default function DashboardPage() {
             Join Employee
           </button>
         ) : null}
+        </div>
       </section>
 
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -241,6 +305,29 @@ export default function DashboardPage() {
             </Link>
           );
         })}
+
+        {boards
+          .filter((board) => !workspaces.some((workspace) => {
+            const searchable = `${board.name} ${board.team_name ?? ""}`.toLowerCase();
+            return workspace.aliases.some((alias) => searchable.includes(alias));
+          }))
+          .map((board) => (
+            <div key={board.id} className="relative min-h-[170px] rounded-2xl border border-white/40 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-xl">
+              <Link href={`/dashboard/boards?boardId=${board.id}`} className="group block">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-700 transition group-hover:bg-violet-700 group-hover:text-white">
+                  <Waypoints size={21} />
+                </div>
+                <h2 className="mt-7 pr-20 text-xl font-semibold text-slate-950">{board.name}</h2>
+                <p className="mt-2 text-sm text-slate-500">{board.description || `Open ${board.name}.`}</p>
+              </Link>
+              {canManageBoards && !board.is_system ? (
+                <div className="absolute right-4 top-4 flex gap-1">
+                  <button type="button" title="Edit board" onClick={() => void editBoard(board)} className="rounded-lg border bg-white p-2 text-slate-500 hover:text-violet-700"><Pencil size={15} /></button>
+                  <button type="button" title="Delete board" onClick={() => void deleteBoard(board)} className="rounded-lg border bg-white p-2 text-slate-500 hover:border-red-200 hover:text-red-600"><Trash2 size={15} /></button>
+                </div>
+              ) : null}
+            </div>
+          ))}
       </section>
 
       {showJoin && canJoinEmployee ? (

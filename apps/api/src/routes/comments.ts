@@ -281,7 +281,7 @@ router.patch("/:id", async(req,res)=>{
 
 
   const {id}=req.params;
-  const {body}=req.body;
+  const {body, mention_ids}=req.body;
 
 
   if(!body || typeof body !== "string" || !body.trim()){
@@ -292,6 +292,15 @@ router.patch("/:id", async(req,res)=>{
     });
 
   }
+
+
+  const mentions = Array.isArray(mention_ids)
+    ? [...new Set(
+        mention_ids
+        .map(Number)
+        .filter((mentionId:number)=>Number.isInteger(mentionId) && mentionId>0)
+      )]
+    : [];
 
 
 
@@ -358,10 +367,24 @@ router.patch("/:id", async(req,res)=>{
     ]
   );
 
+  // Notify users newly mentioned while editing this same comment.
+  if(mentions.length){
+
+    await notifyMentionedUsers(
+      {
+        taskId:comment.task_id,
+        actorId:req.user!.id,
+        userIds:mentions,
+        message:
+        `{actor} mentioned you in task "${comment.task_title}": ${shortenForNotification(body)}`
+      },
+      client
+    );
+
+  }
 
 
-
-  // Only edit notification
+  // Keep the existing edit notification for the task creator.
   await notifyTaskCreator(
     {
       task:{
@@ -377,7 +400,9 @@ router.patch("/:id", async(req,res)=>{
       title:"Comment edited",
 
       message:
-      `{actor} edited a comment on task "${comment.task_title}": ${shortenForNotification(body)}`
+      `{actor} edited a comment on task "${comment.task_title}": ${shortenForNotification(body)}`,
+
+      skipUserIds:mentions,
     },
     client
   );

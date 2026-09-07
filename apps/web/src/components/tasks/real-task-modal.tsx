@@ -426,6 +426,26 @@ export default function RealTaskModal({
       .slice(0, 6);
   }, [users, mentionQuery, mentionedUserIds]);
 
+  const editMentionQuery = useMemo(() => {
+    if (editingCommentId === null) return null;
+    const match = editingCommentBody.match(/(?:^|\s)@([^@\n]*)$/);
+    return match ? match[1].trim().toLowerCase() : null;
+  }, [editingCommentBody, editingCommentId]);
+
+  const editMentionSuggestions = useMemo(() => {
+    if (editMentionQuery === null) return [];
+
+    return users
+      .filter((person) => {
+        if (!editMentionQuery) return true;
+        return (
+          person.full_name.toLowerCase().includes(editMentionQuery) ||
+          person.email.toLowerCase().includes(editMentionQuery)
+        );
+      })
+      .slice(0, 6);
+  }, [users, editMentionQuery]);
+
   function insertMention(user: UserOption) {
     const atIndex = comment.lastIndexOf("@");
     if (atIndex < 0) return;
@@ -438,6 +458,15 @@ export default function RealTaskModal({
       current.includes(String(user.id))
         ? current
         : [...current, String(user.id)],
+    );
+  }
+
+  function insertEditMention(person: UserOption) {
+    const atIndex = editingCommentBody.lastIndexOf("@");
+    if (atIndex < 0) return;
+
+    setEditingCommentBody(
+      editingCommentBody.slice(0, atIndex) + `@${person.full_name} `,
     );
   }
 
@@ -1766,6 +1795,58 @@ export default function RealTaskModal({
 
                       {String(editingCommentId) === String(entry.id) && !isDeleted ? (
                         <div className="min-w-60 space-y-2" onClick={(event) => event.stopPropagation()}>
+                          <select
+                            value=""
+                            onChange={(event) => {
+                              const selectedPerson = users.find(
+                                (person) => String(person.id) === event.target.value,
+                              );
+                              if (!selectedPerson) return;
+
+                              const spacer = editingCommentBody.trimEnd().length > 0 ? " " : "";
+                              setEditingCommentBody(
+                                `${editingCommentBody.trimEnd()}${spacer}@${selectedPerson.full_name} `,
+                              );
+                            }}
+                            className="h-9 w-full rounded-xl border border-violet-200 bg-violet-50 px-3 text-xs font-semibold text-violet-800 outline-none focus:border-violet-400"
+                            aria-label="Mention employee while editing"
+                          >
+                            <option value="">@ Mention employee</option>
+                            {users
+                              .filter((person) => Number(person.id) !== Number(user.id))
+                              .map((person) => (
+                                <option key={String(person.id)} value={String(person.id)}>
+                                  {person.full_name} — {person.role}
+                                </option>
+                              ))}
+                          </select>
+                          {editMentionSuggestions.length > 0 ? (
+                            <div className="max-h-44 overflow-y-auto rounded-xl border border-emerald-200 bg-white shadow-lg">
+                              <div className="border-b bg-emerald-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                                Mention employee
+                              </div>
+                              {editMentionSuggestions.map((mentionUser) => (
+                                <button
+                                  key={String(mentionUser.id)}
+                                  type="button"
+                                  onClick={() => insertEditMention(mentionUser)}
+                                  className="flex w-full items-center justify-between gap-2 border-b px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+                                >
+                                  <span className="min-w-0">
+                                    <span className="block truncate text-xs font-semibold text-slate-900">
+                                      {mentionUser.full_name}
+                                    </span>
+                                    <span className="block truncate text-[10px] text-slate-500">
+                                      {mentionUser.email}
+                                    </span>
+                                  </span>
+                                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold text-slate-600">
+                                    {mentionUser.role}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
                           <textarea
                             value={editingCommentBody}
                             onChange={(event) => setEditingCommentBody(event.target.value)}

@@ -3,6 +3,9 @@ import { db } from "../db/pool";
 
 const router = Router();
 
+const boardManagerRoles = new Set(["Manager", "Admin", "Coordinator", "Team Lead"]);
+const canManageBoards = (role: string | undefined) => boardManagerRoles.has(role ?? "");
+
 const defaultWorkflow = [
   ["To Do", 1],
   ["In Progress", 2],
@@ -26,6 +29,9 @@ router.post("/", async (req, res) => {
   const client = await db.connect();
 
   try {
+    if (!canManageBoards(req.user!.role)) {
+      return res.status(403).json({ success: false, message: "Only a Team Lead, Coordinator or Manager can create boards" });
+    }
     const { name, description, team_id } = req.body;
 
     if (!name || typeof name !== "string" || !name.trim()) {
@@ -43,8 +49,8 @@ router.post("/", async (req, res) => {
 
     for (const [stageName, position] of defaultWorkflow) {
       await client.query(
-        "INSERT INTO workflow_stages (board_id, name, position) VALUES ($1, $2, $3)",
-        [board.id, stageName, position]
+        "INSERT INTO workflow_stages (board_id, name, position, created_by, is_system) VALUES ($1, $2, $3, $4, TRUE)",
+        [board.id, stageName, position, req.user!.id]
       );
     }
 
@@ -66,6 +72,15 @@ router.post("/", async (req, res) => {
 
 router.patch("/:id", async (req, res) => {
   try {
+    if (!canManageBoards(req.user!.role)) {
+      return res.status(403).json({ success: false, message: "Not authorized to edit boards" });
+    }
+
+    const existing = await db.query("SELECT id,is_system FROM boards WHERE id=$1", [req.params.id]);
+    if (!existing.rows[0]) return res.status(404).json({ success: false, message: "Board not found" });
+    if (existing.rows[0].is_system) {
+      return res.status(403).json({ success: false, message: "Permanent boards cannot be edited" });
+    }
     const { name, description, team_id } = req.body;
 
     if (name !== undefined && (typeof name !== "string" || !name.trim())) {
@@ -107,6 +122,15 @@ router.patch("/:id", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   try {
+    if (!canManageBoards(req.user!.role)) {
+      return res.status(403).json({ success: false, message: "Not authorized to delete boards" });
+    }
+
+    const existing = await db.query("SELECT id,is_system FROM boards WHERE id=$1", [req.params.id]);
+    if (!existing.rows[0]) return res.status(404).json({ success: false, message: "Board not found" });
+    if (existing.rows[0].is_system) {
+      return res.status(403).json({ success: false, message: "Permanent boards cannot be deleted" });
+    }
     const usage = await db.query(
       "SELECT COUNT(*)::int AS task_count FROM tasks WHERE board_id = $1",
       [req.params.id]

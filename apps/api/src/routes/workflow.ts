@@ -3,6 +3,8 @@ import { db } from "../db/pool";
 
 const router = Router();
 
+const listCreatorRoles = new Set(["Manager", "Admin", "Coordinator", "Team Lead"]);
+
 router.get("/", async (req, res) => {
   try {
     const boardId = Number(req.query.board_id);
@@ -22,6 +24,9 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
+    if (!listCreatorRoles.has(req.user!.role)) {
+      return res.status(403).json({ success: false, message: "Only a Team Lead, Coordinator or Manager can add lists" });
+    }
     const boardId = Number(req.body.board_id);
     const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
     if (!Number.isInteger(boardId) || boardId <= 0 || !name) {
@@ -38,8 +43,8 @@ router.post("/", async (req, res) => {
       [boardId]
     );
     const result = await db.query(
-      "INSERT INTO workflow_stages (board_id,name,position) VALUES ($1,$2,$3) RETURNING *",
-      [boardId, name, Number(next.rows[0].position)]
+      "INSERT INTO workflow_stages (board_id,name,position,created_by,is_system) VALUES ($1,$2,$3,$4,FALSE) RETURNING *",
+      [boardId, name, Number(next.rows[0].position), req.user!.id]
     );
     return res.status(201).json({ success: true, data: result.rows[0] });
   } catch (error: any) {
@@ -59,10 +64,14 @@ router.patch("/:id", async (req, res) => {
       return res.status(400).json({ success: false, message: "Valid list id and name are required" });
     }
 
-    const result = await db.query(
-      "UPDATE workflow_stages SET name=$1 WHERE id=$2 RETURNING *",
-      [name, id]
-    );
+    const stage = await db.query("SELECT id,created_by,is_system FROM workflow_stages WHERE id=$1", [id]);
+    if (!stage.rows[0]) return res.status(404).json({ success: false, message: "List not found" });
+    if (stage.rows[0].is_system) return res.status(403).json({ success: false, message: "Permanent lists cannot be edited" });
+    if (!listCreatorRoles.has(req.user!.role)) {
+      return res.status(403).json({ success: false, message: "Only a Team Lead, Coordinator or Manager can edit custom lists" });
+    }
+
+    const result = await db.query("UPDATE workflow_stages SET name=$1 WHERE id=$2 RETURNING *", [name, id]);
     if (!result.rows[0]) {
       return res.status(404).json({ success: false, message: "List not found" });
     }
@@ -86,12 +95,21 @@ router.delete("/:id", async (req, res) => {
 
     await client.query("BEGIN");
     const stage = await client.query(
-      "SELECT id,board_id,name,position FROM workflow_stages WHERE id=$1 FOR UPDATE",
+      "SELECT id,board_id,name,position,created_by,is_system FROM workflow_stages WHERE id=$1 FOR UPDATE",
       [id]
     );
     if (!stage.rows[0]) {
       await client.query("ROLLBACK");
       return res.status(404).json({ success: false, message: "List not found" });
+    }
+
+    if (stage.rows[0].is_system) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ success: false, message: "Permanent lists cannot be deleted" });
+    }
+    if (!listCreatorRoles.has(req.user!.role)) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ success: false, message: "Only a Team Lead, Coordinator or Manager can delete custom lists" });
     }
 
     const taskCount = await client.query("SELECT COUNT(*)::int AS count FROM tasks WHERE stage_id=$1", [id]);

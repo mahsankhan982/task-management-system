@@ -9,6 +9,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Trash2,
   UserRound,
 } from "lucide-react";
 import type { DragEvent, FormEvent } from "react";
@@ -28,6 +29,8 @@ type Board = {
   description: string | null;
   team_id: number | null;
   team_name: string | null;
+  created_by?: number | null;
+  is_system?: boolean;
 };
 
 type Team = {
@@ -40,6 +43,8 @@ type WorkflowStage = {
   name: string;
   position: number;
   board_id?: number;
+  created_by?: number | null;
+  is_system?: boolean;
 };
 
 type Task = {
@@ -97,6 +102,17 @@ const assigneeStageMoves: Record<string, string[]> = {
 const COMPLETED_BY_LEAD_MESSAGE =
   "Only a Team Lead, Manager or Coordinator can move a task to Completed";
 
+const permanentBoardNames = new Set([
+  "creative", "creative board",
+  "website", "website board",
+  "digital", "digital board",
+  "qa", "qa board",
+]);
+
+function isPermanentBoard(board: Board | undefined) {
+  return Boolean(board?.is_system) || permanentBoardNames.has(String(board?.name ?? "").trim().toLowerCase());
+}
+
 export default function BoardsPage() {
   const getDueState = (task: Task) => {
     if (!task.due_date || task.stage_name === "Completed") return "normal";
@@ -113,7 +129,7 @@ export default function BoardsPage() {
   const requestedTaskId = Number(searchParams.get("task"));
 
   const { permissions, role, user } = useRole();
-  const canManageBoards = role !== "Team Member";
+  const canManageBoards = ["Manager", "Admin", "Coordinator", "Team Lead"].includes(role);
   const [boards, setBoards] = useState<Board[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [workflow, setWorkflow] = useState<WorkflowStage[]>([]);
@@ -265,6 +281,8 @@ export default function BoardsPage() {
         id: Number(stage.id),
         name: stage.name,
         stageIds: [Number(stage.id)],
+        created_by: stage.created_by,
+        is_system: Boolean(stage.is_system),
       }));
 
     return [
@@ -273,6 +291,8 @@ export default function BoardsPage() {
             id: Number(toDo.id),
             name: "To Do",
             stageIds: [Number(toDo.id)],
+            created_by: toDo.created_by,
+            is_system: true,
           }
         : null,
       inProgress
@@ -280,6 +300,8 @@ export default function BoardsPage() {
             id: Number(inProgress.id),
             name: "In Progress",
             stageIds: [Number(inProgress.id)],
+            created_by: inProgress.created_by,
+            is_system: true,
           }
         : null,
       waiting || review || waitingForLead
@@ -289,6 +311,8 @@ export default function BoardsPage() {
             stageIds: [waiting?.id, review?.id, waitingForLead?.id]
               .filter((id): id is number => typeof id === "number")
               .map(Number),
+            created_by: (waiting ?? review ?? waitingForLead)!.created_by,
+            is_system: true,
           }
         : null,
       completed
@@ -296,6 +320,8 @@ export default function BoardsPage() {
             id: Number(completed.id),
             name: "Completed",
             stageIds: [Number(completed.id)],
+            created_by: completed.created_by,
+            is_system: true,
           }
         : null,
       ...customLists,
@@ -303,6 +329,8 @@ export default function BoardsPage() {
       id: number;
       name: string;
       stageIds: number[];
+      created_by?: number | null;
+      is_system?: boolean;
     }>;
   }, [boardWorkflow]);
 
@@ -510,6 +538,18 @@ export default function BoardsPage() {
     }
   }
 
+  async function deleteBoard(board: Board) {
+    if (!canManageBoards || isPermanentBoard(board)) return;
+    if (!window.confirm(`Delete board "${board.name}"?`)) return;
+    try {
+      setError("");
+      await apiRequest(`/boards/${board.id}`, { method: "DELETE" });
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete board");
+    }
+  }
+
 
   async function createList() {
     if (!canManageBoards || !selectedBoardId) return;
@@ -529,6 +569,31 @@ export default function BoardsPage() {
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create list");
+    }
+  }
+
+  async function editList(stage: { id: number; name: string; created_by?: number | null; is_system?: boolean }) {
+    if (stage.is_system || !canManageBoards) return;
+    const name = window.prompt("List name:", stage.name)?.trim();
+    if (!name || name === stage.name) return;
+    try {
+      setError("");
+      await apiRequest(`/workflow/${stage.id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to edit list");
+    }
+  }
+
+  async function deleteList(stage: { id: number; name: string; created_by?: number | null; is_system?: boolean }) {
+    if (stage.is_system || !canManageBoards) return;
+    if (!window.confirm(`Delete list "${stage.name}"?`)) return;
+    try {
+      setError("");
+      await apiRequest(`/workflow/${stage.id}`, { method: "DELETE" });
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete list");
     }
   }
 
@@ -565,7 +630,7 @@ export default function BoardsPage() {
               </button>
             ) : null}
 
-            {selectedBoard && canManageBoards ? (
+            {selectedBoard && canManageBoards && !isPermanentBoard(selectedBoard) ? (
               <>
                 <button
                   type="button"
@@ -574,6 +639,14 @@ export default function BoardsPage() {
                 >
                   <Pencil size={14} />
                   Edit Board
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => void deleteBoard(selectedBoard)}
+                  className="flex items-center gap-2 rounded-md bg-red-500/80 px-3 py-2 text-xs font-semibold text-white transition hover:bg-red-500"
+                >
+                  <Trash2 size={14} /> Delete Board
                 </button>
 
               </>
@@ -729,7 +802,17 @@ export default function BoardsPage() {
                   >
                     <div className="mb-2.5 flex items-center gap-2 px-1">
                       <Icon size={16} className="text-slate-600" />
-                      <h2 className="text-sm font-semibold text-slate-800">{stage.name} ({stageTasks.length})</h2>
+                      <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{stage.name} ({stageTasks.length})</h2>
+                      {!stage.is_system && canManageBoards ? (
+                        <div className="flex items-center gap-1">
+                          <button type="button" title="Edit list" onClick={() => void editList(stage)} className="rounded-md p-1 text-slate-500 hover:bg-white hover:text-violet-700">
+                            <Pencil size={13} />
+                          </button>
+                          <button type="button" title="Delete list" onClick={() => void deleteList(stage)} className="rounded-md p-1 text-slate-500 hover:bg-red-50 hover:text-red-600">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
 
                     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
