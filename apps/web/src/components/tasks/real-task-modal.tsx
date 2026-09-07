@@ -60,6 +60,8 @@ type Assignee = {
   full_name: string;
   email: string;
   role: string;
+  assigned_by_id?: Id | null;
+  assigned_by_name?: string | null;
 };
 
 type UserOption = Assignee & {
@@ -373,6 +375,14 @@ export default function RealTaskModal({
     [task?.assignees, user.id],
   );
 
+  // A due date belongs to the person who created the task card. Assignees
+  // and other users can still work with the task according to their normal
+  // permissions, but they cannot change its deadline.
+  const canEditDueDate = useMemo(
+    () => isTaskCreator(user.id, task?.created_by),
+    [task?.created_by, user.id],
+  );
+
   const isMyTask = useMemo(
     () => isTaskCreator(user.id, task?.created_by),
     [task?.created_by, user.id],
@@ -448,7 +458,7 @@ export default function RealTaskModal({
             title: title.trim() || task.title,
             description: description.trim() || null,
             priority,
-            due_date: dueDate || null,
+            ...(canEditDueDate ? { due_date: dueDate || null } : {}),
             // Only roles that may move tasks send a stage; a Team Member's
             // moves go through the status flow instead.
             ...(permissions.moveTask ? { stage_id: stageId || task.stage_id } : {}),
@@ -941,7 +951,7 @@ export default function RealTaskModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-md sm:p-5">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/55 p-2 backdrop-blur-md sm:p-4">
       <button
         type="button"
         aria-label="Close task details"
@@ -949,7 +959,7 @@ export default function RealTaskModal({
         className="absolute inset-0"
       />
 
-      <div className="relative z-10 flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-violet-100 bg-slate-50 shadow-[0_28px_80px_-24px_rgba(22,31,69,0.7)]">
+      <div className="relative z-10 flex h-[calc(100dvh-1rem)] min-h-0 min-w-0 w-full max-w-[min(64rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-3xl border border-violet-100 bg-slate-50 shadow-[0_28px_80px_-24px_rgba(22,31,69,0.7)] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-[min(64rem,calc(100vw-2rem))]">
         <div className="h-1 shrink-0 bg-gradient-to-r from-[#161f45] via-violet-600 to-sky-500" />
         <div className="z-20 flex shrink-0 items-start justify-between border-b border-violet-100 bg-gradient-to-r from-white via-violet-50/40 to-sky-50/70 px-5 py-4 sm:px-7">
           <div className="flex min-w-0 flex-1 items-center gap-3.5">
@@ -1154,8 +1164,8 @@ export default function RealTaskModal({
         ) : error && !task ? (
           <div className="p-8 text-sm text-red-600">{error}</div>
         ) : task ? (
-          <div className="min-h-0 flex-1 gap-3 overflow-y-auto bg-gradient-to-br from-[#5c3d8c] via-[#914eaa] to-[#c55bb5] p-3 lg:grid lg:grid-cols-[1.3fr_.7fr]">
-            <section className="rounded-2xl border border-white/50 bg-gradient-to-br from-white via-white to-violet-50/60 p-5 shadow-xl shadow-violet-950/15 sm:p-6 lg:p-7">
+          <div className="grid min-h-0 w-full max-w-full flex-1 grid-cols-1 gap-3 overflow-x-hidden overflow-y-auto bg-gradient-to-br from-[#5c3d8c] via-[#914eaa] to-[#c55bb5] p-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,.7fr)]">
+            <section className="min-w-0 max-w-full overflow-x-hidden rounded-2xl border border-white/50 bg-gradient-to-br from-white via-white to-violet-50/60 p-5 shadow-xl shadow-violet-950/15 sm:p-6 lg:p-7">
               {error ? (
                 error.includes("Team Members cannot perform this action") ? (
                   <div className="mb-5 flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3.5 text-sm font-medium text-violet-800 shadow-sm">
@@ -1238,9 +1248,14 @@ export default function RealTaskModal({
                     type="date"
                     value={dueDate}
                     onChange={(event) => setDueDate(event.target.value)}
-                    disabled={!editing || !permissions.editTask}
+                    disabled={!editing || !permissions.editTask || !canEditDueDate}
                     className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm normal-case text-slate-800 shadow-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:bg-slate-50"
                   />
+                  {editing && !canEditDueDate ? (
+                    <span className="mt-2 block text-[10px] normal-case text-rose-600">
+                      Only the person who created this task can change the due date.
+                    </span>
+                  ) : null}
                 </label>
               </div>
 
@@ -1618,7 +1633,7 @@ export default function RealTaskModal({
               </div>
             </section>
 
-            <aside className="rounded-2xl border border-white/55 bg-gradient-to-b from-violet-50/95 via-white to-sky-50/95 p-4 shadow-xl shadow-violet-950/15 sm:p-5">
+            <aside className="min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-auto rounded-2xl border border-white/55 bg-gradient-to-b from-violet-50/95 via-white to-sky-50/95 p-4 shadow-xl shadow-violet-950/15 sm:p-5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-8rem)] lg:self-start">
               <div className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-[0_12px_32px_-20px_rgba(76,29,149,0.45)]">
                 <div className="relative flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
                   {selectedChatUser ? (
@@ -1704,7 +1719,7 @@ export default function RealTaskModal({
 
                 <div
                   ref={chatScrollRef}
-                  className="h-[270px] space-y-2 overflow-y-auto scroll-smooth bg-gradient-to-b from-violet-50/50 via-slate-50 to-sky-50/60 px-3 py-3"
+                  className="h-[clamp(12rem,32vh,270px)] space-y-2 overflow-y-auto scroll-smooth bg-gradient-to-b from-violet-50/50 via-slate-50 to-sky-50/60 px-3 py-3"
                   onClick={() => setOpenMessageMenuId(null)}
                 >
                 {conversationLoading ? (
@@ -1985,6 +2000,11 @@ export default function RealTaskModal({
     </div>
   );
 }
+
+
+
+
+
 
 
 

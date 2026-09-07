@@ -457,25 +457,33 @@ router.put("/:id/assignees", async (req, res) => {
     const namesOf = (userIds: number[]) =>
       userIds.map((userId) => nameById.get(userId) ?? `User ${userId}`);
 
-    await client.query("DELETE FROM task_assignees WHERE task_id = $1", [req.params.id]);
-
-    for (const userId of ids) {
+    // Remove only users that were actually unassigned. Keeping the existing
+    // rows is important because assigned_by records who originally assigned
+    // each member and therefore owns due-date changes for that assignment.
+    if (removedIds.length > 0) {
       await client.query(
-        "INSERT INTO task_assignees (task_id, user_id, assigned_by) VALUES ($1,$2,$3)",
+        "DELETE FROM task_assignees WHERE task_id = $1 AND user_id = ANY($2::bigint[])",
+        [req.params.id, removedIds],
+      );
+    }
+
+    for (const userId of addedIds) {
+      await client.query(
+        `INSERT INTO task_assignees (task_id, user_id, assigned_by)
+         VALUES ($1,$2,$3)
+         ON CONFLICT (task_id, user_id) DO NOTHING`,
         [req.params.id, userId, req.user!.id]
       );
 
-      if (!previousIds.has(userId)) {
-        await notifyAssignedUser(
-          {
-            taskId: req.params.id,
-            taskTitle: task.rows[0].title,
-            userId,
-            actorId: req.user!.id,
-          },
-          client,
-        );
-      }
+      await notifyAssignedUser(
+        {
+          taskId: req.params.id,
+          taskTitle: task.rows[0].title,
+          userId,
+          actorId: req.user!.id,
+        },
+        client,
+      );
     }
 
     await client.query(
@@ -637,6 +645,25 @@ router.patch("/:id", async (req, res) => {
       return res.status(404).json({ success: false, message: 'Task not found' });
     }
 
+    const previousDueDate = previousTask.due_date
+      ? String(previousTask.due_date).slice(0, 10)
+      : null;
+    const requestedDueDate = due_date
+      ? String(due_date).slice(0, 10)
+      : null;
+    const dueDateChangeRequested =
+      due_date !== undefined && previousDueDate !== requestedDueDate;
+
+    if (dueDateChangeRequested) {
+      if (Number(previousTask.created_by) !== Number(req.user!.id)) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({
+          success: false,
+          message: "Only the person who created this task can change the due date",
+        });
+      }
+    }
+
     // Team Members never set a stage directly, not even on tasks they created:
     // their moves go through PATCH /:id/status, which keeps them on assigned
     // tasks and stops at Waiting for Review.
@@ -654,8 +681,8 @@ router.patch("/:id", async (req, res) => {
     }
 
     const result = await client.query(
-      "UPDATE tasks SET title=COALESCE($1,title), description=COALESCE($2,description), priority=COALESCE($3,priority), due_date=COALESCE($4,due_date), stage_id=COALESCE($5,stage_id), board_id=COALESCE($6,board_id), updated_at=NOW() WHERE id=$7 RETURNING *",
-      [title ?? null, description ?? null, priority ?? null, due_date ?? null, stage_id ?? null, board_id ?? null, req.params.id]
+      "UPDATE tasks SET title=COALESCE($1,title), description=COALESCE($2,description), priority=COALESCE($3,priority), due_date=CASE WHEN $4::boolean THEN $5::date ELSE due_date END, stage_id=COALESCE($6,stage_id), board_id=COALESCE($7,board_id), updated_at=NOW() WHERE id=$8 RETURNING *",
+      [title ?? null, description ?? null, priority ?? null, due_date !== undefined, due_date || null, stage_id ?? null, board_id ?? null, req.params.id]
     );
 
     if (!result.rows[0]) {
@@ -676,7 +703,6 @@ router.patch("/:id", async (req, res) => {
 
     // Compare what is stored rather than what was sent: the update COALESCEs
     // every field, so a null in the request leaves that column untouched.
-    const previousDueDate = previousTask.due_date ? String(previousTask.due_date).slice(0, 10) : null;
     const newDueDate = updatedTask.due_date ? String(updatedTask.due_date).slice(0, 10) : null;
     const dueDateChanged = previousDueDate !== newDueDate;
 
