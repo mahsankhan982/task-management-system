@@ -11,7 +11,18 @@ async function ensureArchiveSupport() {
   if (!archiveSetupPromise) {
     archiveSetupPromise = (async () => {
       await db.query(
+        "ALTER TABLE workflow_stages ADD COLUMN IF NOT EXISTS created_by BIGINT"
+      );
+      await db.query(
+        "ALTER TABLE workflow_stages ADD COLUMN IF NOT EXISTS is_system BOOLEAN NOT NULL DEFAULT FALSE"
+      );
+      await db.query(
         "ALTER TABLE workflow_stages ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE"
+      );
+      await db.query(
+        `UPDATE workflow_stages
+         SET is_system=TRUE
+         WHERE LOWER(TRIM(name)) IN ('to do','in progress','waiting for review','review','waiting for lead','completed')`
       );
       await db.query(
         "CREATE INDEX IF NOT EXISTS idx_workflow_stages_active_board ON workflow_stages (board_id, position) WHERE is_archived = FALSE"
