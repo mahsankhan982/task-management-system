@@ -979,6 +979,11 @@ export default function RealTaskModal({
     commentFormRef.current?.requestSubmit();
   }
 
+  // Do not render a separate modal shell while task details are loading.
+  // This prevents the temporary "Loading task" popup from appearing before
+  // the real task modal when a notification is opened.
+  if (loading) return null;
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/55 p-2 backdrop-blur-md sm:p-4">
       <button
@@ -1188,9 +1193,7 @@ export default function RealTaskModal({
           </div>
         </div>
 
-        {loading ? (
-          <div className="p-8 text-sm text-slate-500">Loading task details...</div>
-        ) : error && !task ? (
+        {error && !task ? (
           <div className="p-8 text-sm text-red-600">{error}</div>
         ) : task ? (
           <div className="grid min-h-0 w-full max-w-full flex-1 grid-cols-1 gap-3 overflow-x-hidden overflow-y-auto bg-gradient-to-br from-[#5c3d8c] via-[#914eaa] to-[#c55bb5] p-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,.7fr)]">
