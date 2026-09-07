@@ -121,6 +121,7 @@ export default function BoardsPage() {
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [dueDateFilter, setDueDateFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -331,6 +332,7 @@ export default function BoardsPage() {
     return tasks.filter((task) => {
       if (task.board_id !== selectedBoardId) return false;
       if (assigneeFilter && !task.assignees?.some((a) => String(a.id) === assigneeFilter)) return false;
+      if (dueDateFilter && String(task.due_date ?? "").slice(0, 10) !== dueDateFilter) return false;
       if (!clean) return true;
       return (
         task.title.toLowerCase().includes(clean) ||
@@ -338,7 +340,7 @@ export default function BoardsPage() {
         task.stage_name.toLowerCase().includes(clean)
       );
     });
-  }, [tasks, selectedBoardId, query, assigneeFilter]);
+  }, [tasks, selectedBoardId, query, assigneeFilter, dueDateFilter]);
 
   async function moveTask(taskId: number, stageId: number) {
     const task = tasks.find((item) => item.id === taskId);
@@ -654,17 +656,41 @@ export default function BoardsPage() {
           </form>
         ) : null}
 
-        <div className="mb-3 flex items-center rounded-lg border border-white/30 bg-white/95 px-3 shadow-sm">
-          <Search size={16} className="text-slate-400" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search tasks..."
-            className="h-11 w-full bg-transparent px-3 text-sm outline-none"
-          />
+        <div className="mb-3 flex flex-col gap-2 rounded-xl border border-white/30 bg-white/95 p-2 shadow-sm lg:flex-row lg:items-center">
+          <div className="flex min-w-0 flex-1 items-center rounded-lg border border-slate-200 bg-white px-3">
+            <Search size={16} className="shrink-0 text-slate-400" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search tasks..."
+              className="h-11 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
+            />
+          </div>
 
-          <div className="mb-3 flex items-center rounded-lg border border-white/30 bg-white/95 px-3 shadow-sm">
-            <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className="h-11 w-full bg-transparent px-3 text-sm font-medium text-slate-700 outline-none">
+          <div className="flex items-center rounded-lg border border-violet-100 bg-violet-50/60 px-3 lg:w-[210px]">
+            <CalendarDays size={16} className="shrink-0 text-violet-600" />
+            <input
+              type="date"
+              value={dueDateFilter}
+              onChange={(event) => setDueDateFilter(event.target.value)}
+              aria-label="Filter tasks by due date"
+              title="Filter tasks by due date"
+              className="h-11 min-w-0 flex-1 bg-transparent px-2 text-sm font-medium text-slate-700 outline-none"
+            />
+            {dueDateFilter ? (
+              <button
+                type="button"
+                onClick={() => setDueDateFilter("")}
+                className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100"
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
+
+          <div className="flex items-center rounded-lg border border-slate-200 bg-white px-2 lg:w-[250px]">
+            <UserRound size={16} className="ml-1 shrink-0 text-slate-400" />
+            <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className="h-11 min-w-0 flex-1 bg-transparent px-2 text-sm font-medium text-slate-700 outline-none">
               <option value="">All Employees / Assignees</option>
               {assigneeOptions.map(([id, name]) => (
                 <option key={id} value={String(id)}>{name}</option>
