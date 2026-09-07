@@ -6,7 +6,6 @@ import {
   CheckCheck,
   Download,
   LogOut,
-  Plus,
   Search,
   X,
 } from "lucide-react";
@@ -72,7 +71,7 @@ function formatTime(value: string) {
 export default function TopHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, permissions } = useRole();
+  const { user } = useRole();
   const pageTitle = getPageTitle(pathname);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -267,16 +266,6 @@ export default function TopHeader() {
       </div>
 
       <div className="flex-1 md:hidden" />
-
-      {permissions.createTask ? (
-        <Link
-          href="/dashboard/boards"
-          className="hidden h-9 items-center gap-2 rounded-lg bg-[#0c66e4] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0055cc] sm:flex"
-        >
-          <Plus size={17} />
-          Create
-        </Link>
-      ) : null}
 
       <button
         type="button"

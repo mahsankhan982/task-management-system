@@ -206,6 +206,7 @@ export default function RealTaskModal({
   const [stageId, setStageId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  const [assigneeSearch, setAssigneeSearch] = useState("");
   const [comment, setComment] = useState("");
   const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
   const [newChecklist, setNewChecklist] = useState("");
@@ -366,6 +367,16 @@ export default function RealTaskModal({
     () => users.filter((user) => assigneeIds.includes(String(user.id))),
     [users, assigneeIds],
   );
+
+  const filteredAssigneeUsers = useMemo(() => {
+    const query = assigneeSearch.trim().toLowerCase();
+    if (!query) return users;
+    return users.filter((entry) =>
+      [entry.full_name, entry.email, entry.role].some((value) =>
+        value.toLowerCase().includes(query),
+      ),
+    );
+  }, [assigneeSearch, users]);
 
   const isAssignedToMe = useMemo(
     () =>
@@ -602,7 +613,7 @@ export default function RealTaskModal({
   }
 
   async function toggleChecklist(item: ChecklistItem) {
-    if (!permissions.editTask) return;
+    if (!permissions.editTask && !isAssignedToMe) return;
 
     const id = String(item.id);
     try {
@@ -1501,8 +1512,21 @@ export default function RealTaskModal({
                       Assign Employee
                     </label>
 
+                    <div className="relative mt-2">
+                      <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="search"
+                        value={assigneeSearch}
+                        onChange={(event) => setAssigneeSearch(event.target.value)}
+                        placeholder="Search employee by name, email or role..."
+                        className="h-10 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                      />
+                    </div>
+
                     <div className="mt-2 max-h-[260px] overflow-y-auto rounded-xl border border-slate-300 bg-white">
-                      {users.map((user) => {
+                      {filteredAssigneeUsers.length === 0 ? (
+                        <p className="px-3 py-4 text-center text-sm text-slate-500">No employee found.</p>
+                      ) : filteredAssigneeUsers.map((user) => {
                         const userId = String(user.id);
                         const checked = assigneeIds.includes(userId);
 
@@ -1598,7 +1622,7 @@ export default function RealTaskModal({
                           type="checkbox"
                           checked={item.is_completed}
                           disabled={
-                            !permissions.editTask ||
+                            (!permissions.editTask && !isAssignedToMe) ||
                             busyChecklistId === String(item.id)
                           }
                           onChange={() => toggleChecklist(item)}

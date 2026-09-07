@@ -43,6 +43,42 @@ async function notifyChecklistChange(
   }
 }
 
+/** Sends a checklist completion notification to the person who assigned the task. */
+async function notifyTaskAssigner(
+  taskId: unknown,
+  assigneeId: number,
+  itemTitle: string,
+  completed: boolean,
+) {
+  try {
+    await db.query(
+      `INSERT INTO notifications (user_id, task_id, type, title, message)
+       SELECT DISTINCT
+         ta.assigned_by,
+         t.id,
+         'task_checklist_updated',
+         $4,
+         actor.full_name || $5 || $3 || '" on task "' || t.title || '".'
+       FROM task_assignees ta
+       JOIN tasks t ON t.id = ta.task_id
+       JOIN users actor ON actor.id = $2
+       WHERE ta.task_id = $1
+         AND ta.user_id = $2
+         AND ta.assigned_by IS NOT NULL
+         AND ta.assigned_by <> $2`,
+      [
+        taskId,
+        assigneeId,
+        itemTitle,
+        completed ? "Checklist item completed" : "Checklist item reopened",
+        completed ? ' completed "' : ' reopened "',
+      ],
+    );
+  } catch (error) {
+    console.error("Notify task assigner about checklist failed:", error);
+  }
+}
+
 /**
  * Checklist items inherit the ownership of the task they hang off: a Team
  * Member may only touch the checklist of a task they created.
@@ -115,8 +151,30 @@ router.patch("/:id", async (req, res) => {
   try {
     const { title, is_completed, position } = req.body;
 
+    const completionOnly =
+      typeof is_completed === "boolean" && title === undefined && position === undefined;
     const access = await checkChecklistEditAccess(req.user!, req.params.id);
-    if (refuseChecklistEdit(res, access, "Checklist item not found")) return;
+
+    if (access === "not_found") {
+      if (refuseChecklistEdit(res, access, "Checklist item not found")) return;
+    }
+
+    if (access === "forbidden") {
+      const assignment = completionOnly
+        ? await db.query(
+            `SELECT 1
+             FROM checklist_items ci
+             JOIN task_assignees ta ON ta.task_id = ci.task_id
+             WHERE ci.id = $1 AND ta.user_id = $2
+             LIMIT 1`,
+            [req.params.id, req.user!.id],
+          )
+        : { rows: [] };
+
+      if (!assignment.rows[0]) {
+        if (refuseChecklistEdit(res, access, "Checklist item not found")) return;
+      }
+    }
 
     const result = await db.query(
       "UPDATE checklist_items SET title = COALESCE($1, title), is_completed = COALESCE($2, is_completed), position = COALESCE($3, position) WHERE id = $4 RETURNING *",
@@ -131,16 +189,27 @@ router.patch("/:id", async (req, res) => {
 
     // A position-only change is a drag inside the list, not news for anyone.
     if (typeof is_completed === "boolean") {
-      await notifyChecklistChange(
-        item.task_id,
-        req.user!.id,
-        "task_checklist_updated",
-        is_completed ? "Checklist item completed" : "Checklist item reopened",
-        (taskTitle) =>
-          is_completed
-            ? `{actor} ticked off "${item.title}" on task "${taskTitle}".`
-            : `{actor} reopened "${item.title}" on task "${taskTitle}".`,
-      );
+      if (req.user!.role === "Team Member") {
+        await notifyTaskAssigner(
+          item.task_id,
+          req.user!.id,
+          item.title,
+          is_completed,
+        );
+      }
+
+      if (req.user!.role !== "Team Member") {
+        await notifyChecklistChange(
+          item.task_id,
+          req.user!.id,
+          "task_checklist_updated",
+          is_completed ? "Checklist item completed" : "Checklist item reopened",
+          (taskTitle) =>
+            is_completed
+              ? `{actor} ticked off "${item.title}" on task "${taskTitle}".`
+              : `{actor} reopened "${item.title}" on task "${taskTitle}".`,
+        );
+      }
     } else if (title !== undefined && title !== null) {
       await notifyChecklistChange(
         item.task_id,
