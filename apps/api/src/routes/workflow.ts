@@ -5,8 +5,29 @@ const router = Router();
 
 const listCreatorRoles = new Set(["Manager", "Admin", "Coordinator", "Team Lead"]);
 
+let archiveSetupPromise: Promise<void> | null = null;
+
+async function ensureArchiveSupport() {
+  if (!archiveSetupPromise) {
+    archiveSetupPromise = (async () => {
+      await db.query(
+        "ALTER TABLE workflow_stages ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE"
+      );
+      await db.query(
+        "CREATE INDEX IF NOT EXISTS idx_workflow_stages_active_board ON workflow_stages (board_id, position) WHERE is_archived = FALSE"
+      );
+    })().catch((error) => {
+      archiveSetupPromise = null;
+      throw error;
+    });
+  }
+
+  await archiveSetupPromise;
+}
+
 router.get("/", async (req, res) => {
   try {
+    await ensureArchiveSupport();
     const boardId = Number(req.query.board_id);
     const hasBoard = Number.isInteger(boardId) && boardId > 0;
     const result = await db.query(
@@ -24,6 +45,7 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
+    await ensureArchiveSupport();
     if (!listCreatorRoles.has(req.user!.role)) {
       return res.status(403).json({ success: false, message: "Only a Team Lead, Coordinator or Manager can add lists" });
     }
@@ -58,6 +80,7 @@ router.post("/", async (req, res) => {
 
 router.patch("/:id", async (req, res) => {
   try {
+    await ensureArchiveSupport();
     const id = Number(req.params.id);
     const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
     if (!Number.isInteger(id) || id <= 0 || !name) {
@@ -87,6 +110,7 @@ router.patch("/:id", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   try {
+    await ensureArchiveSupport();
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ success: false, message: "Valid list id is required" });
