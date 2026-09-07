@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { flushSync } from "react-dom";
 import {
   useCallback,
   useEffect,
@@ -354,10 +355,13 @@ export default function TopHeader() {
                     key={String(item.id)}
                     type="button"
                     onClick={() => {
+                      flushSync(() => {
+                        setNotificationOpen(false);
+                      });
+
                       if (!item.is_read) void markRead(item.id);
 
                       if (item.task_id) {
-                        setNotificationOpen(false);
                         router.push(
                           `/dashboard/boards?view=board&task=${item.task_id}`,
                         );
