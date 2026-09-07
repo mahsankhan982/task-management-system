@@ -5,6 +5,45 @@ const router = Router();
 
 const boardManagerRoles = new Set(["Manager", "Admin", "Coordinator", "Team Lead"]);
 const canManageBoards = (role: string | undefined) => boardManagerRoles.has(role ?? "");
+const permanentBoardNames = new Set([
+  "creative", "creative board",
+  "website", "website board",
+  "digital", "digital board",
+  "qa", "qa board",
+]);
+const isPermanentBoard = (board: { name?: string; is_system?: boolean }) =>
+  Boolean(board.is_system) || permanentBoardNames.has(String(board.name ?? "").trim().toLowerCase());
+
+let boardSetupPromise: Promise<void> | null = null;
+
+async function ensureBoardManagementSupport() {
+  if (!boardSetupPromise) {
+    boardSetupPromise = (async () => {
+      await db.query(
+        "ALTER TABLE boards ADD COLUMN IF NOT EXISTS is_system BOOLEAN NOT NULL DEFAULT FALSE"
+      );
+      await db.query(
+        "ALTER TABLE boards ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE"
+      );
+      await db.query(
+        `UPDATE boards
+         SET is_system=TRUE
+         WHERE LOWER(TRIM(name)) IN ('creative','creative board','website','website board','digital','digital board','qa','qa board')`
+      );
+      await db.query(
+        "ALTER TABLE workflow_stages ADD COLUMN IF NOT EXISTS created_by BIGINT"
+      );
+      await db.query(
+        "ALTER TABLE workflow_stages ADD COLUMN IF NOT EXISTS is_system BOOLEAN NOT NULL DEFAULT FALSE"
+      );
+    })().catch((error) => {
+      boardSetupPromise = null;
+      throw error;
+    });
+  }
+
+  await boardSetupPromise;
+}
 
 const defaultWorkflow = [
   ["To Do", 1],
@@ -15,8 +54,9 @@ const defaultWorkflow = [
 
 router.get("/", async (_req, res) => {
   try {
+    await ensureBoardManagementSupport();
     const result = await db.query(
-      "SELECT b.*, t.name AS team_name FROM boards b LEFT JOIN teams t ON t.id = b.team_id ORDER BY b.created_at DESC"
+      "SELECT b.*, t.name AS team_name FROM boards b LEFT JOIN teams t ON t.id = b.team_id WHERE COALESCE(b.is_archived,FALSE)=FALSE ORDER BY b.created_at DESC"
     );
     return res.status(200).json({ success: true, data: result.rows });
   } catch (error) {
@@ -29,6 +69,7 @@ router.post("/", async (req, res) => {
   const client = await db.connect();
 
   try {
+    await ensureBoardManagementSupport();
     if (!canManageBoards(req.user!.role)) {
       return res.status(403).json({ success: false, message: "Only a Team Lead, Coordinator or Manager can create boards" });
     }
@@ -72,13 +113,14 @@ router.post("/", async (req, res) => {
 
 router.patch("/:id", async (req, res) => {
   try {
+    await ensureBoardManagementSupport();
     if (!canManageBoards(req.user!.role)) {
       return res.status(403).json({ success: false, message: "Not authorized to edit boards" });
     }
 
-    const existing = await db.query("SELECT id,is_system FROM boards WHERE id=$1", [req.params.id]);
+    const existing = await db.query("SELECT id,name,is_system FROM boards WHERE id=$1", [req.params.id]);
     if (!existing.rows[0]) return res.status(404).json({ success: false, message: "Board not found" });
-    if (existing.rows[0].is_system) {
+    if (isPermanentBoard(existing.rows[0])) {
       return res.status(403).json({ success: false, message: "Permanent boards cannot be edited" });
     }
     const { name, description, team_id } = req.body;
@@ -122,28 +164,25 @@ router.patch("/:id", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   try {
+    await ensureBoardManagementSupport();
     if (!canManageBoards(req.user!.role)) {
       return res.status(403).json({ success: false, message: "Not authorized to delete boards" });
     }
 
-    const existing = await db.query("SELECT id,is_system FROM boards WHERE id=$1", [req.params.id]);
+    const existing = await db.query("SELECT id,name,is_system FROM boards WHERE id=$1", [req.params.id]);
     if (!existing.rows[0]) return res.status(404).json({ success: false, message: "Board not found" });
-    if (existing.rows[0].is_system) {
+    if (isPermanentBoard(existing.rows[0])) {
       return res.status(403).json({ success: false, message: "Permanent boards cannot be deleted" });
     }
-    const usage = await db.query(
-      "SELECT COUNT(*)::int AS task_count FROM tasks WHERE board_id = $1",
+    const result = await db.query(
+      `UPDATE boards
+       SET is_archived=TRUE,
+           name=LEFT(name, 70) || ' [deleted-' || id || ']',
+           updated_at=NOW()
+       WHERE id=$1
+       RETURNING id`,
       [req.params.id]
     );
-
-    if ((usage.rows[0]?.task_count ?? 0) > 0) {
-      return res.status(409).json({
-        success: false,
-        message: "Move or delete board tasks before deleting this board",
-      });
-    }
-
-    const result = await db.query("DELETE FROM boards WHERE id = $1 RETURNING id", [req.params.id]);
 
     if (!result.rows[0]) {
       return res.status(404).json({ success: false, message: "Board not found" });
