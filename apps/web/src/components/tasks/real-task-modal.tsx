@@ -386,11 +386,11 @@ export default function RealTaskModal({
     [task?.assignees, user.id],
   );
 
-  // A due date may be selected while creating the task. After the task has
-  // been saved, only a Manager may change or remove its deadline.
+  // An authorized user may set a missing due date once. After it is saved,
+  // only a Manager may change or remove it.
   const canEditDueDate = useMemo(
-    () => role === "Manager",
-    [role],
+    () => role === "Manager" || !task?.due_date,
+    [role, task?.due_date],
   );
 
   const isMyTask = useMemo(
@@ -1295,7 +1295,7 @@ export default function RealTaskModal({
                   />
                   {editing && !canEditDueDate ? (
                     <span className="mt-2 block text-[10px] normal-case text-rose-600">
-                      Only a Manager can change the due date after the task is saved.
+                      Only a Manager can change the due date after it has been saved.
                     </span>
                   ) : null}
                 </label>
