@@ -78,33 +78,10 @@ export default function TopHeader() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(false);
-  const [toastNotification, setToastNotification] = useState<NotificationItem | null>(null);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const lastNotificationIds = useRef(new Set<string>());
   const notificationsInitialized = useRef(false);
   const notificationNavigationLocked = useRef(false);
-  const playNotificationSound = useCallback(() => {
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContextClass) return;
-      const ctx = new AudioContextClass();
-      const oscillator = ctx.createOscillator();
-      const gain = ctx.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(880, ctx.currentTime);
-      oscillator.frequency.setValueAtTime(660, ctx.currentTime + 0.12);
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
-      oscillator.connect(gain);
-      gain.connect(ctx.destination);
-      oscillator.start();
-      oscillator.stop(ctx.currentTime + 0.31);
-      oscillator.onended = () => { void ctx.close(); };
-    } catch (error) {
-      console.warn("Notification sound could not play", error);
-    }
-  }, []);
 
   useEffect(() => {
     const handleInstallPrompt = (event: Event) => {
@@ -134,8 +111,29 @@ export default function TopHeader() {
         const freshNotifications = incoming.filter((item) => !item.is_read && !lastNotificationIds.current.has(String(item.id)));
 
         if (freshNotifications.length > 0) {
-          playNotificationSound();
-          setToastNotification(freshNotifications[0]);
+          const latest = freshNotifications[0];
+
+          if ("Notification" in window && Notification.permission === "granted") {
+            const popup = new Notification(latest.title || "New task notification", {
+              body: latest.message || "A task notification has arrived.",
+              icon: "/icons/icon-192x192.png",
+              tag: `task-notification-${latest.id}`,
+              silent: false,
+            });
+
+            popup.onclick = () => {
+              popup.close();
+              window.focus();
+              if (!latest.is_read) {
+                void apiRequest(`/notifications/${latest.id}/read`, { method: "PATCH" });
+              }
+              if (latest.task_id) {
+                window.location.assign(
+                  `/dashboard/boards?view=board&task=${latest.task_id}&notification=${latest.id}`,
+                );
+              }
+            };
+          }
         }
       } else {
         notificationsInitialized.current = true;
@@ -147,9 +145,13 @@ export default function TopHeader() {
     } catch {
       // Keep header usable if notifications temporarily fail.
     }
-  }, [playNotificationSound]);
+  }, []);
 
   useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
+
     void loadNotifications();
 
     const notificationTimer = window.setInterval(() => {
@@ -160,12 +162,6 @@ export default function TopHeader() {
       window.clearInterval(notificationTimer);
     };
   }, [loadNotifications]);
-
-  useEffect(() => {
-    if (!toastNotification) return;
-    const timer = window.setTimeout(() => setToastNotification(null), 8000);
-    return () => window.clearTimeout(timer);
-  }, [toastNotification]);
 
   async function markRead(id: NotificationItem["id"]) {
     try {
@@ -193,7 +189,6 @@ export default function TopHeader() {
 
     flushSync(() => {
       setNotificationOpen(false);
-      setToastNotification(null);
     });
 
     if (!item.is_read) void markRead(item.id);
@@ -300,6 +295,9 @@ export default function TopHeader() {
         <button
           type="button"
           onClick={() => {
+            if ("Notification" in window && Notification.permission === "default") {
+              void Notification.requestPermission();
+            }
             setNotificationOpen((current) => !current);
             void loadNotifications();
           }}
@@ -420,39 +418,6 @@ export default function TopHeader() {
         <LogOut size={17} />
       </button>
 
-      {toastNotification ? (
-        <button
-          type="button"
-          onClick={() => openNotificationTask(toastNotification)}
-          className="fixed bottom-5 right-5 z-[250] w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-violet-200 bg-white p-4 text-left shadow-2xl transition hover:-translate-y-0.5 hover:border-violet-400"
-          aria-label="Open notification task"
-        >
-          <span className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700">
-              <Bell size={19} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-bold text-slate-900">
-                {toastNotification.title || "New notification"}
-              </span>
-              <span className="mt-1 block text-xs leading-5 text-slate-600">
-                {toastNotification.message}
-              </span>
-              <span className="mt-2 block text-[10px] font-semibold text-violet-700">
-                Click to open task
-              </span>
-            </span>
-            <X
-              size={16}
-              className="shrink-0 text-slate-400"
-              onClick={(event) => {
-                event.stopPropagation();
-                setToastNotification(null);
-              }}
-            />
-          </span>
-        </button>
-      ) : null}
     </header>
   );
 }
