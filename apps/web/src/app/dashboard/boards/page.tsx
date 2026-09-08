@@ -147,6 +147,17 @@ export default function BoardsPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [selectedTaskInitialEdit, setSelectedTaskInitialEdit] = useState(false);
 
+  function closeTaskModal() {
+    setSelectedTaskInitialEdit(false);
+    setSelectedTaskId(null);
+
+    // Consume the notification task URL so later data refreshes cannot reopen it.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("task");
+    url.searchParams.delete("notification");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
   async function loadData() {
     try {
       const [boardsResponse, tasksResponse, workflowResponse, teamsResponse] = (await Promise.all([
@@ -940,10 +951,7 @@ export default function BoardsPage() {
           <RealTaskModal
             taskId={selectedTaskId}
             initialEditMode={selectedTaskInitialEdit}
-            onClose={() => {
-              setSelectedTaskInitialEdit(false);
-              setSelectedTaskId(null);
-            }}
+            onClose={closeTaskModal}
             onChanged={loadData}
           />
         ) : null}
