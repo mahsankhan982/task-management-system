@@ -655,11 +655,11 @@ router.patch("/:id", async (req, res) => {
       due_date !== undefined && previousDueDate !== requestedDueDate;
 
     if (dueDateChangeRequested) {
-      if (Number(previousTask.created_by) !== Number(req.user!.id)) {
+      if (req.user!.role !== "Manager") {
         await client.query('ROLLBACK');
         return res.status(403).json({
           success: false,
-          message: "Only the person who created this task can change the due date",
+          message: "Only a Manager can change the due date after the task is saved",
         });
       }
     }

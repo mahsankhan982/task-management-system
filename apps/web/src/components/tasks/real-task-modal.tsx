@@ -386,12 +386,11 @@ export default function RealTaskModal({
     [task?.assignees, user.id],
   );
 
-  // A due date belongs to the person who created the task card. Assignees
-  // and other users can still work with the task according to their normal
-  // permissions, but they cannot change its deadline.
+  // A due date may be selected while creating the task. After the task has
+  // been saved, only a Manager may change or remove its deadline.
   const canEditDueDate = useMemo(
-    () => isTaskCreator(user.id, task?.created_by),
-    [task?.created_by, user.id],
+    () => role === "Manager",
+    [role],
   );
 
   const isMyTask = useMemo(
@@ -1296,7 +1295,7 @@ export default function RealTaskModal({
                   />
                   {editing && !canEditDueDate ? (
                     <span className="mt-2 block text-[10px] normal-case text-rose-600">
-                      Only the person who created this task can change the due date.
+                      Only a Manager can change the due date after the task is saved.
                     </span>
                   ) : null}
                 </label>

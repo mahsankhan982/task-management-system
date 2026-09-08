@@ -433,6 +433,7 @@ export default function BoardsPage() {
     const title = String(form.get("title") || "").trim();
     const priority = String(form.get("priority") || "Medium") as Priority;
     const stageId = Number(form.get("stage_id"));
+    const dueDate = String(form.get("due_date") || "");
 
     if (!title || !stageId) return;
 
@@ -450,6 +451,7 @@ export default function BoardsPage() {
           stage_id: stageId,
           title,
           priority,
+          due_date: dueDate || null,
         }),
       });
 
@@ -702,7 +704,7 @@ export default function BoardsPage() {
         {showCreate && permissions.createTask ? (
           <form
             onSubmit={handleCreateTask}
-            className="mb-4 grid gap-3 rounded-2xl border bg-white p-4 shadow-sm md:grid-cols-[1fr_180px_220px_auto]"
+            className="mb-4 grid gap-3 rounded-2xl border bg-white p-4 shadow-sm md:grid-cols-[1fr_160px_190px_180px_auto]"
           >
             <input
               name="title"
@@ -732,6 +734,12 @@ export default function BoardsPage() {
                 </option>
               ))}
             </select>
+            <input
+              type="date"
+              name="due_date"
+              title="Due date"
+              className="h-11 rounded-xl border px-3 text-sm outline-none focus:border-violet-500"
+            />
             <button
               type="submit"
               disabled={creating}
