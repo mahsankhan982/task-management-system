@@ -389,7 +389,7 @@ export default function RealTaskModal({
   // An authorized user may set a missing due date once. After it is saved,
   // only a Manager may change or remove it.
   const canEditDueDate = useMemo(
-    () => role === "Manager" || !task?.due_date,
+    () => role === "Manager" || !dateInputValue(task?.due_date ?? null),
     [role, task?.due_date],
   );
 

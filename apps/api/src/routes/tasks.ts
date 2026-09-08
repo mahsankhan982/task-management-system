@@ -645,12 +645,21 @@ router.patch("/:id", async (req, res) => {
       return res.status(404).json({ success: false, message: 'Task not found' });
     }
 
-    const previousDueDate = previousTask.due_date
-      ? String(previousTask.due_date).slice(0, 10)
-      : null;
-    const requestedDueDate = due_date
-      ? String(due_date).slice(0, 10)
-      : null;
+    const normalizeDueDate = (value: unknown) => {
+      if (value === undefined || value === null || value === "") return null;
+
+      const raw = String(value);
+      const isoMatch = raw.match(/^\d{4}-\d{2}-\d{2}/);
+      if (isoMatch) return isoMatch[0];
+
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime())
+        ? null
+        : parsed.toISOString().slice(0, 10);
+    };
+
+    const previousDueDate = normalizeDueDate(previousTask.due_date);
+    const requestedDueDate = normalizeDueDate(due_date);
     const dueDateChangeRequested =
       due_date !== undefined && previousDueDate !== requestedDueDate;
 
