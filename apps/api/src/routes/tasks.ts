@@ -662,28 +662,25 @@ router.patch("/:id", async (req, res) => {
     const requestedDueDate = normalizeDueDate(due_date);
     const dueDateChangeRequested =
       due_date !== undefined && previousDueDate !== requestedDueDate;
+if (dueDateChangeRequested) {
+  // If there was no previous due date, anyone can set it initially
+  if (previousDueDate === null) {
+    // no restriction
+  } else if (req.user!.role !== "Manager" && req.user!.role !== "Coordinator") {
+    await client.query('ROLLBACK');
+    return res.status(403).json({
+      success: false,
+      message: "Only a Manager or Coordinator can change the due date",
+    });
+  }
+}
 
-    if (dueDateChangeRequested) {
-      const dueDateWasAlreadySet = Boolean(previousDueDate);
-
-      if (dueDateWasAlreadySet && req.user!.role !== "Manager") {
-        await client.query('ROLLBACK');
-        return res.status(403).json({
-          success: false,
-          message: "Only a Manager can change the due date after it has been saved",
-        });
-      }
-    }
-
-    // Team Members never set a stage directly, not even on tasks they created:
-    // their moves go through PATCH /:id/status, which keeps them on assigned
-    // tasks and stops at Waiting for Review.
-    if (
-      req.user!.role === "Team Member" &&
-      stage_id !== undefined &&
-      stage_id !== null &&
-      Number(stage_id) !== Number(previousTask.stage_id)
-    ) {
+if (
+  req.user!.role === "Team Member" &&
+  stage_id !== undefined &&
+  stage_id !== null &&
+  Number(stage_id) !== Number(previousTask.stage_id)
+) {
       await client.query('ROLLBACK');
       return res.status(403).json({
         success: false,
