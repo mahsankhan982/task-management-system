@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { apiBlobRequest, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
-import { getTaskPermissions, isTaskCreator } from "@/lib/permissions";
+import { canEditAttachment, getTaskPermissions, isTaskCreator } from "@/lib/permissions";
 import ChakorLogo from "@/components/brand/chakor-logo";
 
 function AuthImage({ attachmentId, alt, className }: { attachmentId: Id, alt: string, className?: string }) {
@@ -226,6 +226,15 @@ export default function RealTaskModal({
   const [attachmentUrl, setAttachmentUrl] = useState("");
   const [attachmentLabel, setAttachmentLabel] = useState("");
   const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [editingAttachment, setEditingAttachment] = useState<TaskAttachment | null>(null);
+  const [editAttachmentLabel, setEditAttachmentLabel] = useState("");
+  const [editAttachmentUrl, setEditAttachmentUrl] = useState("");
+  const [editAttachmentFile, setEditAttachmentFile] = useState<File | null>(null);
+  const [deleteAttachmentTarget, setDeleteAttachmentTarget] = useState<TaskAttachment | null>(null);
+  const [attachmentToast, setAttachmentToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const [error, setError] = useState("");
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [previewImageTitle, setPreviewImageTitle] = useState<string>("");
@@ -388,12 +397,10 @@ export default function RealTaskModal({
 
   // An authorized user may set a missing due date once. After it is saved,
   // only a Manager may change or remove it.
-  const canEditDueDate = useMemo(() => {
-  // If no due date saved yet, everyone can set it
-  if (!task?.due_date) return true;
-  // Once a due date exists, only Manager or Coordinator may change it
-  return role === "Manager" || role === "Coordinator";
-}, [role, task?.due_date]);
+  const canEditDueDate = useMemo(
+    () => role === "Manager" || !dateInputValue(task?.due_date ?? null),
+    [role, task?.due_date],
+  );
 
   const isMyTask = useMemo(
     () => isTaskCreator(user.id, task?.created_by),
@@ -815,20 +822,129 @@ export default function RealTaskModal({
     }
   }
 
-  async function deleteAttachment(attachment: TaskAttachment) {
-    const canDelete =
-      false ||
-      Number(attachment.uploaded_by) === Number(user.id);
+  function showAttachmentToast(
+    type: "success" | "error",
+    message: string,
+  ) {
+    setAttachmentToast({ type, message });
 
-    if (!canDelete) return;
+    window.setTimeout(() => {
+      setAttachmentToast((current) =>
+        current?.message === message ? null : current,
+      );
+    }, 2800);
+  }
 
-    const name =
-      attachment.label ||
-      attachment.file_name ||
-      attachment.url ||
-      "attachment";
+  function openAttachmentEditor(attachment: TaskAttachment) {
+    if (!canEditAttachment(role, user.id, task?.created_by)) return;
 
-    if (!window.confirm(`Delete attachment "${name}"?`)) return;
+    setEditingAttachment(attachment);
+    setEditAttachmentLabel(attachment.label ?? "");
+    setEditAttachmentUrl(attachment.url ?? "");
+    setEditAttachmentFile(null);
+    setError("");
+  }
+
+  async function saveAttachmentEdit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    const attachment = editingAttachment;
+    if (!attachment) return;
+
+    if (!canEditAttachment(role, user.id, task?.created_by)) return;
+
+    if (editAttachmentFile && editAttachmentFile.size > 3 * 1024 * 1024) {
+      const message = "Maximum direct upload size is 3 MB.";
+      setError(message);
+      showAttachmentToast("error", message);
+      return;
+    }
+
+    try {
+      setAttachmentBusy(true);
+      setError("");
+
+      const label = editAttachmentLabel.trim();
+
+      if (attachment.attachment_type === "link") {
+        const url = editAttachmentUrl.trim();
+
+        if (!url) {
+          throw new Error("Enter a valid link");
+        }
+
+        await apiRequest(`/attachments/${attachment.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            label: label || null,
+            url,
+          }),
+        });
+      } else if (editAttachmentFile) {
+        const fileData = await editAttachmentFile.arrayBuffer();
+
+        const query = new URLSearchParams({
+          file_name: editAttachmentFile.name,
+          mime_type:
+            editAttachmentFile.type || "application/octet-stream",
+          label,
+        });
+
+        await apiRequest(
+          `/attachments/${attachment.id}?${query.toString()}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/octet-stream",
+            },
+            body: fileData,
+          },
+        );
+      } else {
+        await apiRequest(`/attachments/${attachment.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            label: label || null,
+          }),
+        });
+      }
+
+      await loadAttachments();
+
+      setEditingAttachment(null);
+      setEditAttachmentFile(null);
+
+      showAttachmentToast(
+        "success",
+        "Attachment updated successfully",
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to edit attachment";
+
+      setError(message);
+      showAttachmentToast("error", message);
+    } finally {
+      setAttachmentBusy(false);
+    }
+  }
+
+  function requestDeleteAttachment(attachment: TaskAttachment) {
+    if (!canEditAttachment(role, user.id, task?.created_by)) return;
+
+    setDeleteAttachmentTarget(attachment);
+    setError("");
+  }
+
+  async function confirmDeleteAttachment() {
+    const attachment = deleteAttachmentTarget;
+    if (!attachment) return;
+
+    if (!canEditAttachment(role, user.id, task?.created_by)) return;
 
     try {
       setAttachmentBusy(true);
@@ -839,11 +955,21 @@ export default function RealTaskModal({
       });
 
       await loadAttachments();
-      await loadTask(false);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to delete attachment",
+
+      setDeleteAttachmentTarget(null);
+
+      showAttachmentToast(
+        "success",
+        "Attachment deleted successfully",
       );
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to delete attachment";
+
+      setError(message);
+      showAttachmentToast("error", message);
     } finally {
       setAttachmentBusy(false);
     }
@@ -1297,7 +1423,7 @@ export default function RealTaskModal({
                   />
                   {editing && !canEditDueDate ? (
                     <span className="mt-2 block text-[10px] normal-case text-rose-600">
-                      Only a Manager or Coordinator can change the due date after it has been saved.
+                      Only a Manager can change the due date after it has been saved.
                     </span>
                   ) : null}
                 </label>
@@ -1420,9 +1546,11 @@ export default function RealTaskModal({
                               ? Video
                               : FileText;
 
-                      const canDelete =
-                        false ||
-                        Number(attachment.uploaded_by) === Number(user.id);
+                      const canManageAttachment = canEditAttachment(
+                        role,
+                        user.id,
+                        task?.created_by,
+                      );
 
                       return (
                         <div
@@ -1456,7 +1584,7 @@ export default function RealTaskModal({
                               {attachment.attachment_type === "file"
                                 ? `${attachment.mime_type || "File"}${
                                     attachment.file_size
-                                      ? ` Ã‚Â· ${Math.max(
+                                      ? ` · ${Math.max(
                                           1,
                                           Math.round(
                                             Number(attachment.file_size) / 1024,
@@ -1466,33 +1594,47 @@ export default function RealTaskModal({
                                   }`
                                 : attachment.url}
                               {attachment.uploader_name
-                                ? ` Ã‚Â· Added by ${attachment.uploader_name}`
+                                ? ` · Added by ${attachment.uploader_name}`
                                 : ""}
                             </p>
                           </button>
 
-                          {attachment.attachment_type === "file" ? (
-                            <button
-                              type="button"
-                              onClick={() => void downloadAttachment(attachment)}
-                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-violet-50 hover:text-violet-700"
-                              title="Download attachment"
-                            >
-                              <Download size={15} />
-                            </button>
-                          ) : null}
+                            {attachment.attachment_type === "file" ? (
+                              <button
+                                type="button"
+                                onClick={() => void downloadAttachment(attachment)}
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-violet-50 hover:text-violet-700"
+                                title="Download attachment"
+                                aria-label="Download attachment"
+                              >
+                                <Download size={15} />
+                              </button>
+                            ) : null}
 
-                          {canDelete ? (
-                            <button
-                              type="button"
-                              onClick={() => void deleteAttachment(attachment)}
-                              disabled={attachmentBusy}
-                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-                              title="Delete attachment"
-                              aria-label="Delete attachment"
-                            >
-                              <Trash2 size={15} />
-                            </button>
+                          {canManageAttachment ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openAttachmentEditor(attachment)}
+                                disabled={attachmentBusy}
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-40"
+                                title="Edit attachment"
+                                aria-label="Edit attachment"
+                              >
+                                <Pencil size={15} />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => requestDeleteAttachment(attachment)}
+                                disabled={attachmentBusy}
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                                title="Delete attachment"
+                                aria-label="Delete attachment"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </>
                           ) : null}
                         </div>
                       );
@@ -2087,6 +2229,199 @@ export default function RealTaskModal({
         ) : null}
       </div>
       
+      {attachmentToast ? (
+        <div
+          className={`fixed right-4 top-4 z-[150] max-w-sm rounded-xl border px-4 py-3 text-sm font-semibold shadow-2xl ${
+            attachmentToast.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {attachmentToast.message}
+        </div>
+      ) : null}
+
+      {editingAttachment ? (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <button
+            type="button"
+            aria-label="Close attachment editor"
+            className="absolute inset-0"
+            onClick={() => {
+              if (!attachmentBusy) {
+                setEditingAttachment(null);
+                setEditAttachmentFile(null);
+              }
+            }}
+          />
+
+          <form
+            onSubmit={saveAttachmentEdit}
+            className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-2xl"
+          >
+            <div className="h-1 bg-gradient-to-r from-[#161f45] via-violet-600 to-sky-500" />
+
+            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Edit attachment
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Update the attachment details.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={attachmentBusy}
+                onClick={() => {
+                  setEditingAttachment(null);
+                  setEditAttachmentFile(null);
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+                aria-label="Close"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Display name
+                </label>
+                <input
+                  value={editAttachmentLabel}
+                  onChange={(event) =>
+                    setEditAttachmentLabel(event.target.value)
+                  }
+                  placeholder={
+                    editingAttachment.file_name ||
+                    editingAttachment.url ||
+                    "Attachment"
+                  }
+                  className="mt-2 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                />
+              </div>
+
+              {editingAttachment.attachment_type === "link" ? (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    URL
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={editAttachmentUrl}
+                    onChange={(event) =>
+                      setEditAttachmentUrl(event.target.value)
+                    }
+                    className="mt-2 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Replace file
+                  </label>
+                  <input
+                    type="file"
+                    onChange={(event) =>
+                      setEditAttachmentFile(
+                        event.target.files?.[0] ?? null,
+                      )
+                    }
+                    className="mt-2 block w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-600"
+                  />
+                  <p className="mt-1 text-xs text-slate-400">
+                    Optional. Maximum file size 3 MB.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
+              <button
+                type="button"
+                disabled={attachmentBusy}
+                onClick={() => {
+                  setEditingAttachment(null);
+                  setEditAttachmentFile(null);
+                }}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={attachmentBusy}
+                className="flex items-center gap-2 rounded-xl bg-violet-700 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-800 disabled:opacity-50"
+              >
+                {attachmentBusy ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Save size={15} />
+                )}
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {deleteAttachmentTarget ? (
+        <div className="fixed inset-0 z-[135] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+          <button
+            type="button"
+            aria-label="Cancel delete attachment"
+            className="absolute inset-0"
+            onClick={() => {
+              if (!attachmentBusy) {
+                setDeleteAttachmentTarget(null);
+              }
+            }}
+          />
+
+          <div className="relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border border-red-100 bg-white shadow-2xl">
+            <div className="p-6">
+              <h3 className="text-base font-semibold text-slate-900">
+                Delete attachment
+              </h3>
+
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                Are you sure you want to delete this attachment?
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4">
+              <button
+                type="button"
+                disabled={attachmentBusy}
+                onClick={() => setDeleteAttachmentTarget(null)}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={attachmentBusy}
+                onClick={() => void confirmDeleteAttachment()}
+                className="flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {attachmentBusy ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Trash2 size={15} />
+                )}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {previewImageUrl && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4">
           <button

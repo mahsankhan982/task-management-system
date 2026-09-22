@@ -57,35 +57,83 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     await ensureArchiveSupport();
+
     if (!listCreatorRoles.has(req.user!.role)) {
-      return res.status(403).json({ success: false, message: "Only a Team Lead, Coordinator or Manager can add lists" });
+      return res.status(403).json({
+        success: false,
+        message: "Only a Team Lead, Coordinator or Manager can add lists",
+      });
     }
+
     const boardId = Number(req.body.board_id);
-    const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
+    const name =
+      typeof req.body.name === "string" ? req.body.name.trim() : "";
+
     if (!Number.isInteger(boardId) || boardId <= 0 || !name) {
-      return res.status(400).json({ success: false, message: "Board and list name are required" });
+      return res.status(400).json({
+        success: false,
+        message: "Board and list name are required",
+      });
     }
 
-    const board = await db.query("SELECT id FROM boards WHERE id = $1", [boardId]);
-    if (!board.rows[0]) {
-      return res.status(404).json({ success: false, message: "Board not found" });
-    }
+    const client = await db.connect();
 
-    const next = await db.query(
-      "SELECT COALESCE(MAX(position),0)+1 AS position FROM workflow_stages WHERE board_id=$1",
-      [boardId]
-    );
-    const result = await db.query(
-      "INSERT INTO workflow_stages (board_id,name,position,created_by,is_system) VALUES ($1,$2,$3,$4,FALSE) RETURNING *",
-      [boardId, name, Number(next.rows[0].position), req.user!.id]
-    );
-    return res.status(201).json({ success: true, data: result.rows[0] });
+    try {
+      await client.query("BEGIN");
+
+      // Lock this board while its custom-list ordering is being changed.
+      const board = await client.query(
+        "SELECT id FROM boards WHERE id = $1 FOR UPDATE",
+        [boardId],
+      );
+
+      if (!board.rows[0]) {
+        await client.query("ROLLBACK");
+
+        return res.status(404).json({
+          success: false,
+          message: "Board not found",
+        });
+      }
+
+      // Shift ONLY custom lists. System stages remain untouched.
+      await client.query(
+        "UPDATE workflow_stages SET position = position + 1 WHERE board_id = $1 AND is_system = FALSE",
+        [boardId],
+      );
+
+      // Newly created custom list is always the left-most custom list.
+      const result = await client.query(
+        "INSERT INTO workflow_stages (board_id,name,position,created_by,is_system) VALUES ($1,$2,0,$3,FALSE) RETURNING *",
+        [boardId, name, req.user!.id],
+      );
+
+      await client.query("COMMIT");
+
+      return res.status(201).json({
+        success: true,
+        data: result.rows[0],
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error: any) {
     if (error?.code === "23505") {
-      return res.status(409).json({ success: false, message: "This list name already exists on the board" });
+      return res.status(409).json({
+        success: false,
+        message: "This list name already exists on the board",
+      });
     }
+
     console.error("Create workflow list failed:", error);
-    return res.status(500).json({ success: false, message: "Unable to create list" });
+
+    return res.status(500).json({
+      success: false,
+      message: "Unable to create list",
+    });
   }
 });
 

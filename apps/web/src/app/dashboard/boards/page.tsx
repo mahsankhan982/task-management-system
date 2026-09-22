@@ -13,7 +13,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { DragEvent, FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
@@ -135,6 +135,7 @@ export default function BoardsPage() {
   const [workflow, setWorkflow] = useState<WorkflowStage[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [dueDateFilter, setDueDateFilter] = useState("");
@@ -288,16 +289,36 @@ export default function BoardsPage() {
     );
 
     const customLists = boardWorkflow
-      .filter((stage) => !coreIds.has(Number(stage.id)))
+      .filter(
+        (stage) =>
+          !stage.is_system &&
+          !coreIds.has(Number(stage.id)),
+      )
+      .sort((a, b) => Number(b.id) - Number(a.id))
       .map((stage) => ({
         id: Number(stage.id),
         name: stage.name,
         stageIds: [Number(stage.id)],
         created_by: stage.created_by,
-        is_system: Boolean(stage.is_system),
+        is_system: false,
+      }));
+
+    const otherSystemLists = boardWorkflow
+      .filter(
+        (stage) =>
+          Boolean(stage.is_system) &&
+          !coreIds.has(Number(stage.id)),
+      )
+      .map((stage) => ({
+        id: Number(stage.id),
+        name: stage.name,
+        stageIds: [Number(stage.id)],
+        created_by: stage.created_by,
+        is_system: true,
       }));
 
     return [
+      ...customLists,
       toDo
         ? {
             id: Number(toDo.id),
@@ -336,7 +357,7 @@ export default function BoardsPage() {
             is_system: true,
           }
         : null,
-      ...customLists,
+      ...otherSystemLists,
     ].filter(Boolean) as Array<{
       id: number;
       name: string;
@@ -582,6 +603,8 @@ export default function BoardsPage() {
         }),
       });
       await loadData();
+      // Scroll to the left to show the newly created custom list
+      scrollContainerRef.current?.scrollTo({ left: 0, behavior: "smooth" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create list");
     }
@@ -627,19 +650,19 @@ export default function BoardsPage() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-gradient-to-br from-[#64499a] via-[#a85dbd] to-[#d46bb6] p-3 md:p-4">
+    <div className="flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden p-3 md:p-4" style={{ background: "linear-gradient(135deg,#263B49 0%,#17364E 52%,#0E2D45 100%)" }}>
       <BoardNavPanels boards={boards} selectedBoardId={selectedBoardId} onSelectBoard={(id) => setSelectedBoardId(id)} />
       <div className="mx-auto flex min-h-0 w-full flex-1 flex-col max-w-none">
-        <div className="mb-3 flex flex-col gap-3 rounded-xl border border-white/10 bg-[#5b3f88]/95 p-3 text-white shadow-lg backdrop-blur lg:flex-row lg:items-center lg:justify-between">
+        <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-white/10 bg-gradient-to-r from-[#071827] via-[#0E304A] to-[#184967] p-4 text-white shadow-2xl shadow-black/20 backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-violet-200">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-[#E6C87D]">
               Live Workspace
             </p>
             <h1 className="mt-1 text-xl font-bold text-white">
               {selectedBoard?.name ?? "Boards"}
             </h1>
             <p className="mt-1 text-xs text-white/70">
-              {selectedBoard?.team_name ?? "No team"} Ãƒâ€šÃ‚Â· PostgreSQL data
+              {selectedBoard?.team_name ?? "No team"} · PostgreSQL data
             </p>
           </div>
 
@@ -684,7 +707,7 @@ export default function BoardsPage() {
                 onClick={() => setSelectedBoardId(board.id)}
                 className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
                   board.id === selectedBoardId
-                    ? "bg-white text-[#5b3f88] shadow-sm"
+                    ? "bg-[#E9D399] text-[#082034] shadow-lg"
                     : "bg-white/15 text-white hover:bg-white/25"
                 }`}
               >
@@ -762,7 +785,7 @@ export default function BoardsPage() {
         ) : null}
 
         <div className="mb-3 flex flex-col gap-2 rounded-xl border border-white/30 bg-white/95 p-2 shadow-sm lg:flex-row lg:items-center">
-          <div className="flex min-w-0 flex-1 items-center rounded-lg border border-slate-200 bg-white px-3">
+          <div className="flex min-w-0 flex-1 items-center rounded-lg border border-[#DCE5EC] bg-gradient-to-br from-white to-[#F8FBFD] px-3">
             <Search size={16} className="shrink-0 text-slate-400" />
             <input
               value={query}
@@ -793,7 +816,7 @@ export default function BoardsPage() {
             ) : null}
           </div>
 
-          <div className="flex items-center rounded-lg border border-slate-200 bg-white px-2 lg:w-[250px]">
+          <div className="flex items-center rounded-lg border border-[#DCE5EC] bg-gradient-to-br from-white to-[#F8FBFD] px-2 lg:w-[250px]">
             <UserRound size={16} className="ml-1 shrink-0 text-slate-400" />
             <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className="h-11 min-w-0 flex-1 bg-transparent px-2 text-sm font-medium text-slate-700 outline-none">
               <option value="">All Employees / Assignees</option>
@@ -809,7 +832,7 @@ export default function BoardsPage() {
             No boards found in the database.
           </div>
         ) : (
-          <div className="min-h-0 flex-1 overflow-x-auto rounded-xl bg-black/10 p-2 pb-4">
+          <div className="min-h-0 flex-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-[#DCE6EF]/90 p-3 pb-4 shadow-inner backdrop-blur-sm" ref={scrollContainerRef}>
             <div className="flex h-full min-w-max items-stretch gap-3">
               {displayWorkflow.map((stage) => {
                 const Icon = stageIcons[stage.name as keyof typeof stageIcons] ?? CircleDot;
@@ -830,7 +853,7 @@ export default function BoardsPage() {
                       if (taskId) moveTask(taskId, stage.id);
                       setDraggedTaskId(null);
                     }}
-                    className="flex h-full max-h-full w-[285px] shrink-0 flex-col rounded-xl bg-[#f1f2f4] p-2.5 shadow-sm"
+                    className="flex h-full max-h-full w-[285px] shrink-0 flex-col rounded-2xl border border-[#DCE5EC] bg-gradient-to-br from-white to-[#F8FBFD]/95 p-3 shadow-xl shadow-slate-950/10"
                   >
                     <div className="mb-2.5 flex items-center gap-2 px-1">
                       <Icon size={16} className="text-slate-600" />
@@ -862,7 +885,7 @@ export default function BoardsPage() {
                           }}
                           onDragStart={(event) => handleDragStart(event, task.id)}
                           onDragEnd={() => setDraggedTaskId(null)}
-                          className={`cursor-pointer rounded-lg border border-l-4 p-3 shadow-sm transition hover:border-[#0c66e4] hover:shadow-md ${priorityBorderClass[task.priority]} ${getDueState(task) === "overdue" ? "!border-red-500 !bg-red-50" : getDueState(task) === "today" ? "!border-yellow-500 !bg-yellow-50" : "border-slate-200 bg-white"}`}
+                          className={`cursor-pointer rounded-xl border border-l-4 p-3.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-[#1B4A6C] hover:shadow-[0_10px_24px_rgba(15,23,42,0.10)] ${priorityBorderClass[task.priority]} ${getDueState(task) === "overdue" ? "!border-[#D2AA5D] !bg-[#FFF9EE] shadow-[0_8px_20px_rgba(11,39,64,0.07)]" : getDueState(task) === "today" ? "!border-[#7EA8C3] !bg-[#F2F8FB] shadow-[0_8px_20px_rgba(11,39,64,0.07)]" : "border-[#CADBE5] bg-gradient-to-br from-[#FCFDFE] to-[#EEF5F8] shadow-[0_8px_20px_rgba(11,39,64,0.07)]"}`}
                         >
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span
@@ -872,7 +895,7 @@ export default function BoardsPage() {
                             </span>
 
                             {isTaskCreator(user.id, task.created_by) ? (
-                              <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">
+                              <span className="inline-flex rounded-full border border-[#C9DCE9] bg-[#EDF5FA] px-2 py-1 text-[10px] font-semibold text-[#1B557A]">
                                 Created by you
                               </span>
                             ) : null}
@@ -912,7 +935,7 @@ export default function BoardsPage() {
                       ))}
 
                       {stageTasks.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-slate-300 p-5 text-center text-xs text-slate-400">
+                        <div className="rounded-xl border border-dashed border-[#C9B36C] bg-white p-5 text-center text-xs text-slate-400">
                           No tasks
                         </div>
                       ) : null}
@@ -923,7 +946,7 @@ export default function BoardsPage() {
                       <button
                         type="button"
                         onClick={() => toggleTaskCreator(stage.id)}
-                        className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white/80 px-3 text-sm font-semibold text-slate-700 transition hover:border-violet-400 hover:bg-white hover:text-violet-700"
+                        className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white/80 px-3 text-sm font-semibold text-slate-700 transition hover:border-[#B9944F] hover:bg-[#FFFDF8] hover:text-[#173F5E]"
                       >
                         <Plus size={16} />
                         {showCreate && createStageId === stage.id ? "Close Add Task" : "Add Task"}

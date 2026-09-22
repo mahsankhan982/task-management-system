@@ -347,13 +347,17 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ success: false, message: "Attachment not found" });
     }
 
-    const isOwner = Number(attachment.uploaded_by) === Number(req.user!.id);
-    const canManage = req.user!.role !== "Team Member";
+    // Check if the current user created the parent task
+    const taskCreatorResult = await db.query('SELECT created_by FROM tasks WHERE id = $1', [attachment.task_id]);
+    const taskCreator = taskCreatorResult.rows[0];
+    const isTaskCreator = taskCreator && Number(taskCreator.created_by) === Number(req.user!.id);
+    const canManage =
+      req.user!.role === "Coordinator";
 
-    if (!isOwner && !canManage) {
+    if (!isTaskCreator && !canManage) {
       return res.status(403).json({
         success: false,
-        message: "You can only delete attachments you uploaded",
+        message: "You do not have permission to modify this attachment",
       });
     }
 
@@ -385,6 +389,113 @@ router.delete("/:id", async (req, res) => {
   } catch (error) {
     console.error("Delete attachment failed:", error);
     return res.status(500).json({ success: false, message: "Unable to delete attachment" });
+  }
+});
+
+// PATCH attachment – edit label, URL, or replace file
+router.patch('/:id', express.raw({ type: 'application/octet-stream', limit: MAX_FILE_BYTES }), async (req, res) => {
+  try {
+    const attachmentId = Number(req.params.id);
+    if (!Number.isInteger(attachmentId) || attachmentId <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid attachment' });
+    }
+
+    // Load current attachment and its task
+    const curRes = await db.query(
+      `SELECT id, task_id, uploaded_by, attachment_type, file_name, mime_type, file_data, label, url
+       FROM task_attachments WHERE id = $1 LIMIT 1`,
+      [attachmentId]
+    );
+    const attachment = curRes.rows[0];
+    if (!attachment) {
+      return res.status(404).json({ success: false, message: 'Attachment not found' });
+    }
+
+    // Permission check: Coordinator, Admin, or task creator
+    const taskRes = await db.query('SELECT created_by FROM tasks WHERE id = $1', [attachment.task_id]);
+    const task = taskRes.rows[0];
+    const isCreator = task && Number(task.created_by) === Number(req.user!.id);
+    const allowed =
+      req.user!.role === 'Coordinator' ||
+      isCreator;
+    if (!allowed) {
+      return res.status(403).json({ success: false, message: 'You are not allowed to edit this attachment' });
+    }
+
+    // Determine update fields
+    const isRaw = req.headers['content-type']?.includes('application/octet-stream');
+    const hasRawLabel = isRaw && typeof req.query.label === 'string';
+    const hasBodyLabel =
+      !isRaw &&
+      req.body &&
+      typeof req.body === 'object' &&
+      !Buffer.isBuffer(req.body) &&
+      Object.prototype.hasOwnProperty.call(req.body, 'label');
+
+    const newLabel = hasRawLabel
+      ? String(req.query.label ?? '').trim() || null
+      : hasBodyLabel
+        ? String((req.body as any).label ?? '').trim() || null
+        : attachment.label;
+
+    if (attachment.attachment_type === 'link') {
+      const { url } = req.body as any;
+      let newUrl = typeof url === 'string' ? url.trim() : attachment.url;
+      if (newUrl) {
+        try {
+          const parsed = new URL(newUrl);
+          if (!['http:', 'https:'].includes(parsed.protocol)) {
+            return res.status(400).json({ success: false, message: 'Only http and https links are allowed' });
+          }
+          newUrl = parsed.toString();
+        } catch {
+          return res.status(400).json({ success: false, message: 'Enter a valid link' });
+        }
+      }
+      await db.query(`UPDATE task_attachments SET label = $1, url = $2 WHERE id = $3`, [newLabel, newUrl, attachmentId]);
+    } else {
+      if (isRaw) {
+        const fileData = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+        if (!fileData.length) {
+          return res.status(400).json({ success: false, message: 'Choose a file to upload' });
+        }
+        if (fileData.length > MAX_FILE_BYTES) {
+          return res.status(413).json({ success: false, message: 'File is too large. Maximum direct upload size is 3 MB.' });
+        }
+        const fileName = String(
+          req.query.file_name ?? attachment.file_name ?? '',
+        ).trim();
+        const mimeType =
+          String(
+            req.query.mime_type ?? attachment.mime_type ?? '',
+          ).trim() || 'application/octet-stream';
+        await db.query(
+          `UPDATE task_attachments SET file_name = $1, mime_type = $2, file_size = $3, file_data = $4, label = $5 WHERE id = $6`,
+          [fileName.slice(0, 255), mimeType.slice(0, 150), fileData.length, fileData, newLabel, attachmentId]
+        );
+      } else {
+        await db.query(`UPDATE task_attachments SET label = $1 WHERE id = $2`, [newLabel, attachmentId]);
+      }
+    }
+
+    // Single activity log entry for edit
+    await db.query(
+      `INSERT INTO activity_logs (task_id, user_id, action, details) VALUES ($1,$2,$3,$4::jsonb)`,
+      [attachment.task_id, req.user!.id, 'attachment_edited', JSON.stringify({ id: attachmentId, type: attachment.attachment_type })]
+    );
+
+    // Notify as an addition (so UI treats it like a new attachment)
+    await notifyAttachmentChange(
+      attachment.task_id,
+      req.user!.id,
+      'added',
+      newLabel || attachment.file_name || attachment.url || 'attachment'
+    );
+
+    return res.status(200).json({ success: true, message: 'Attachment updated' });
+  } catch (error) {
+    console.error('Edit attachment failed:', error);
+    return res.status(500).json({ success: false, message: 'Unable to edit attachment' });
   }
 });
 
