@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  ArrowRight,
   Code2,
   Megaphone,
   Palette,
@@ -213,10 +214,31 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-full w-full bg-gradient-to-br from-[#64499a] via-[#a85dbd] to-[#d46bb6] p-5 md:p-8">
+    <div className="relative min-h-full w-full overflow-hidden bg-[#0c1230] p-5 md:p-8">
+      <div
+        className="pointer-events-none absolute inset-0 bg-cover bg-center"
+        style={{ backgroundImage: "url(/chakor-building-bg.png)" }}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#0a0f2b] via-[#0a0f2b]/85 to-[#0a0f2b]/40"
+        aria-hidden="true"
+      />
+
+      <p
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-6 left-5 select-none text-[13vw] font-black uppercase leading-none tracking-tight text-amber-100/10 md:left-8 md:text-6xl"
+      >
+        Chakor
+        <span className="mt-1 block text-[3vw] font-semibold tracking-[0.35em] text-amber-100/10 md:text-xs">
+          Building a Brighter Tomorrow
+        </span>
+      </p>
+
+      <div className="relative z-10">
       <section className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-violet-100">
+          <p className="text-xs font-semibold uppercase tracking-wider text-amber-300">
             Live Workspace
           </p>
 
@@ -224,14 +246,14 @@ export default function DashboardPage() {
             Dashboard
           </h1>
 
-          <p className="mt-2 text-sm text-white/80">
+          <p className="mt-2 text-sm text-white/70">
             Select the workspace you want to manage.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-3">
         {canManageBoards ? (
-          <button type="button" onClick={() => void createBoard()} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-violet-700 px-5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-violet-800 hover:shadow-lg">
+          <button type="button" onClick={() => void createBoard()} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-[#161f45] shadow-sm transition hover:-translate-y-0.5 hover:bg-amber-50 hover:shadow-lg">
             <Plus size={18} /> Add New Board
           </button>
         ) : null}
@@ -243,7 +265,7 @@ export default function DashboardPage() {
               setJoinSuccess("");
               setShowJoin(true);
             }}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-semibold text-violet-700 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/40 bg-white/10 px-5 text-sm font-semibold text-white shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/20 hover:shadow-lg"
           >
             <UserPlus size={18} />
             Join Employee
@@ -265,17 +287,17 @@ export default function DashboardPage() {
             <>
               <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${
                 board
-                  ? "bg-violet-50 text-violet-700 transition group-hover:bg-violet-700 group-hover:text-white"
-                  : "bg-slate-100 text-slate-400"
+                  ? "bg-amber-100 text-[#161f45] transition group-hover:bg-amber-300"
+                  : "bg-white/10 text-white/40"
               }`}>
                 <Icon size={21} />
               </div>
 
-              <h2 className="mt-7 text-xl font-semibold text-slate-950">
+              <h2 className="mt-7 text-xl font-semibold text-white">
                 {workspace.title}
               </h2>
 
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-white/60">
                 {board
                   ? `Open ${board.name}.`
                   : "No board data available yet."}
@@ -288,7 +310,7 @@ export default function DashboardPage() {
               <div
                 key={workspace.title}
                 aria-disabled="true"
-                className="min-h-[170px] cursor-not-allowed rounded-2xl border border-white/30 bg-white/80 p-6 opacity-70 shadow-sm"
+                className="min-h-[170px] cursor-not-allowed rounded-2xl border border-white/15 bg-white/5 p-6 opacity-70 backdrop-blur-sm"
               >
                 {cardContent}
               </div>
@@ -299,8 +321,11 @@ export default function DashboardPage() {
             <Link
               key={workspace.title}
               href={`/dashboard/boards?boardId=${board.id}`}
-              className="group min-h-[170px] rounded-2xl border border-white/40 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-xl"
+              className="group relative min-h-[170px] rounded-2xl border border-amber-200/25 bg-[#0f1638]/70 p-6 shadow-lg backdrop-blur-sm transition hover:-translate-y-1 hover:border-amber-200/60 hover:shadow-xl"
             >
+              <span className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-amber-200/40 text-amber-200 transition group-hover:bg-amber-200 group-hover:text-[#161f45]">
+                <ArrowRight size={16} />
+              </span>
               {cardContent}
             </Link>
           );
@@ -312,23 +337,24 @@ export default function DashboardPage() {
             return workspace.aliases.some((alias) => searchable.includes(alias));
           }))
           .map((board) => (
-            <div key={board.id} className="relative min-h-[170px] rounded-2xl border border-white/40 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:border-violet-300 hover:shadow-xl">
+            <div key={board.id} className="relative min-h-[170px] rounded-2xl border border-amber-200/25 bg-[#0f1638]/70 p-6 shadow-lg backdrop-blur-sm transition hover:-translate-y-1 hover:border-amber-200/60 hover:shadow-xl">
               <Link href={`/dashboard/boards?boardId=${board.id}`} className="group block">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-violet-700 transition group-hover:bg-violet-700 group-hover:text-white">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-[#161f45] transition group-hover:bg-amber-300">
                   <Waypoints size={21} />
                 </div>
-                <h2 className="mt-7 pr-20 text-xl font-semibold text-slate-950">{board.name}</h2>
-                <p className="mt-2 text-sm text-slate-500">{board.description || `Open ${board.name}.`}</p>
+                <h2 className="mt-7 pr-20 text-xl font-semibold text-white">{board.name}</h2>
+                <p className="mt-2 text-sm text-white/60">{board.description || `Open ${board.name}.`}</p>
               </Link>
               {canManageBoards && !board.is_system ? (
                 <div className="absolute right-4 top-4 flex gap-1">
-                  <button type="button" title="Edit board" onClick={() => void editBoard(board)} className="rounded-lg border bg-white p-2 text-slate-500 hover:text-violet-700"><Pencil size={15} /></button>
-                  <button type="button" title="Delete board" onClick={() => void deleteBoard(board)} className="rounded-lg border bg-white p-2 text-slate-500 hover:border-red-200 hover:text-red-600"><Trash2 size={15} /></button>
+                  <button type="button" title="Edit board" onClick={() => void editBoard(board)} className="rounded-lg border border-white/20 bg-white/10 p-2 text-white/70 hover:text-amber-200"><Pencil size={15} /></button>
+                  <button type="button" title="Delete board" onClick={() => void deleteBoard(board)} className="rounded-lg border border-white/20 bg-white/10 p-2 text-white/70 hover:border-red-300/40 hover:text-red-300"><Trash2 size={15} /></button>
                 </div>
               ) : null}
             </div>
           ))}
       </section>
+      </div>
 
       {showJoin && canJoinEmployee ? (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
@@ -466,3 +492,6 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+
+
