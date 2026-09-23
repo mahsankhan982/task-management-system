@@ -200,26 +200,7 @@ export default function BoardsPage() {
         }))
         .sort((a, b) => a.position - b.position);
 
-      // Provision real IDs through the existing API; never send a display-only ID.
-      if (canManageBoards) {
-        for (const board of nextBoards) {
-          if (nextWorkflow.some((stage) => stage.board_id === board.id && stage.name === "For Posting")) continue;
-          try {
-            const response = (await apiRequest("/workflow", {
-              method: "POST",
-              body: JSON.stringify({ board_id: board.id, name: "For Posting" }),
-            })) as { data: WorkflowStage };
-            nextWorkflow.push({ ...response.data, id: Number(response.data.id), board_id: board.id, position: Number(response.data.position) });
-          } catch (error) {
-            // Another client may have created it concurrently. Reuse that ID.
-            const refreshed = (await api.workflow()) as { data: WorkflowStage[] };
-            const existing = refreshed.data.find((stage) => Number(stage.board_id) === board.id && stage.name === "For Posting");
-            if (!existing) throw error;
-            nextWorkflow.push({ ...existing, id: Number(existing.id), board_id: board.id, position: Number(existing.position) });
-          }
-        }
-      }
-
+      // System stages are initialized by the workflow API; reads never POST lists.
       setError("");
       setBoards(nextBoards);
       setTeams(nextTeams);

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db } from "../db/pool";
+import { ensureForPosting } from "../lib/workflowStages";
 
 const router = Router();
 
@@ -27,6 +28,17 @@ async function ensureArchiveSupport() {
       await db.query(
         "CREATE INDEX IF NOT EXISTS idx_workflow_stages_active_board ON workflow_stages (board_id, position) WHERE is_archived = FALSE"
       );
+      const client = await db.connect();
+      try {
+        await client.query("BEGIN");
+        // Stable lock order serializes concurrent clients without shifting positions.
+        const boards = await client.query("SELECT id FROM boards ORDER BY id FOR UPDATE");
+        for (const board of boards.rows) await ensureForPosting(client, Number(board.id));
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally { client.release(); }
     })().catch((error) => {
       archiveSetupPromise = null;
       throw error;
@@ -69,10 +81,10 @@ router.post("/", async (req, res) => {
     const name =
       typeof req.body.name === "string" ? req.body.name.trim() : "";
 
-    if (!Number.isInteger(boardId) || boardId <= 0 || !name) {
+    if (!Number.isInteger(boardId) || boardId <= 0 || !name || name.length > 50) {
       return res.status(400).json({
         success: false,
-        message: "Board and list name are required",
+        message: "A valid board and a list name of 1–50 characters are required",
       });
     }
 
@@ -96,15 +108,15 @@ router.post("/", async (req, res) => {
         });
       }
 
-      // Shift ONLY custom lists. System stages remain untouched.
-      await client.query(
-        "UPDATE workflow_stages SET position = position + 1 WHERE board_id = $1 AND is_system = FALSE",
-        [boardId],
-      );
+      if (name.toLowerCase() === "for posting") {
+        const result = await ensureForPosting(client, boardId, req.user!.id);
+        await client.query("COMMIT");
+        return res.status(result.created ? 201 : 200).json({ success: true, data: result.stage });
+      }
 
       // Newly created custom list is always the left-most custom list.
       const result = await client.query(
-        "INSERT INTO workflow_stages (board_id,name,position,created_by,is_system) VALUES ($1,$2,0,$3,$4) RETURNING *",
+        "INSERT INTO workflow_stages (board_id,name,position,created_by,is_system) SELECT $1,$2,LEAST(COALESCE(MIN(position),0),0)-1,$3,$4 FROM workflow_stages WHERE board_id=$1 RETURNING *",
         [boardId, name, req.user!.id, ["to do", "in progress", "waiting for review", "review", "waiting for lead", "for posting", "completed"].includes(name.toLowerCase())],
       );
 
@@ -124,7 +136,9 @@ router.post("/", async (req, res) => {
     if (error?.code === "23505") {
       return res.status(409).json({
         success: false,
-        message: "This list name already exists on the board",
+        message: error.constraint === "workflow_stages_board_name_unique" || error.constraint === "workflow_stages_name_key"
+          ? "This list name already exists on the board"
+          : "List ordering conflict. Refresh the board and retry.",
       });
     }
 
@@ -142,8 +156,8 @@ router.patch("/:id", async (req, res) => {
     await ensureArchiveSupport();
     const id = Number(req.params.id);
     const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
-    if (!Number.isInteger(id) || id <= 0 || !name) {
-      return res.status(400).json({ success: false, message: "Valid list id and name are required" });
+    if (!Number.isInteger(id) || id <= 0 || !name || name.length > 50) {
+      return res.status(400).json({ success: false, message: "A valid list id and a name of 1–50 characters are required" });
     }
 
     const stage = await db.query("SELECT id,created_by,is_system FROM workflow_stages WHERE id=$1", [id]);

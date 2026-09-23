@@ -49,7 +49,8 @@ const defaultWorkflow = [
   ["To Do", 1],
   ["In Progress", 2],
   ["Waiting for Review", 3],
-  ["Completed", 4],
+  ["For Posting", 4],
+  ["Completed", 5],
 ] as const;
 
 router.get("/", async (_req, res) => {
@@ -196,4 +197,3 @@ router.delete("/:id", async (req, res) => {
 });
 
 export default router;
-

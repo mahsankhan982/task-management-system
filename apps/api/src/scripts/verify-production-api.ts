@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { db } from "../db/pool";
+import { verifyBoardFlow } from "./verify-board-flow";
 
 // Explicit opt-in: creates a temporary least-privilege account, then removes it.
 async function verify() {
@@ -33,6 +34,7 @@ async function verify() {
         console.log("Verified", base, route, Array.isArray(payload.data) ? `records=${payload.data.length}` : "authenticated");
       }
     }
+    if (process.env.VERIFY_BOARD_FLOW === "1") await verifyBoardFlow(id, email, password);
   } finally {
     if (id !== undefined) {
       await db.query("DELETE FROM users WHERE id=$1 AND email=$2", [id, email]);
