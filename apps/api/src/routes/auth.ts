@@ -289,20 +289,47 @@ router.post("/reset-password", async (req, res) => {
 router.get("/me", requireAuth, async (req, res) => {
   try {
     const result = await db.query(
-      "SELECT id, full_name, email, role, team_id, is_active, avatar_url FROM users WHERE id = $1 LIMIT 1",
+      `
+      SELECT 
+        id,
+        full_name,
+        email,
+        role,
+        team_id,
+        is_active
+      FROM users
+      WHERE id = $1
+      LIMIT 1
+      `,
       [req.user!.id]
     );
 
     const user = result.rows[0];
 
     if (!user || !user.is_active) {
-      return res.status(401).json({ success: false, message: "User not available" });
+      return res.status(401).json({
+        success: false,
+        message: "User not available",
+      });
     }
 
-    return res.status(200).json({ success: true, data: user });
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: Number(user.id),
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+        team_id: user.team_id === null ? null : Number(user.team_id),
+        avatar_url: null,
+      },
+    });
   } catch (error) {
     console.error("Get current user failed:", error);
-    return res.status(500).json({ success: false, message: "Unable to fetch user" });
+    return res.status(500).json({
+      success: false,
+      message: "Unable to fetch user",
+    });
   }
 });
 
