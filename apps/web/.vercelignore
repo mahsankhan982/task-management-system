@@ -1,0 +1,8 @@
+.releases
+.next
+node_modules
+*.log
+*.bak
+*.backup*
+.env*
+served-dashboard.html

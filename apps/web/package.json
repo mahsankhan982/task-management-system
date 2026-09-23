@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build --webpack",
-    "start": "node scripts/release-server.js",
+    "start": "next start",
     "lint": "eslint",
-    "build:legacy": "next build --webpack"
+    "build:legacy": "next build --webpack",
+    "release:build": "node scripts/release-build.js",
+    "release:start": "node scripts/release-server.js"
   },
   "dependencies": {
     "@dnd-kit/sortable": "^10.0.0",

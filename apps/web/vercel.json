@@ -1,12 +1,10 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "package.json", "use": "@vercel/next" }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "/$1" }
-  ],
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "outputDirectory": null,
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://task-management-system-ckgwaa04v-mahsankhan982s-projects.vercel.app"
+    "NEXT_PUBLIC_API_URL": "https://task-management-api-lyart.vercel.app"
   }
 }

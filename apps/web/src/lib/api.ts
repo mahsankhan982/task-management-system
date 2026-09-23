@@ -1,10 +1,10 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+const API_URL = "/api";
 const TOKEN_KEY = "task_management_token";
 
 export function profileImageUrl(path: string) {
   if (!path) return "";
-  const base = new URL(API_URL, typeof window === "undefined" ? "http://localhost:3000" : window.location.origin);
-  return new URL(path, base).href;
+  // Uploaded avatar paths are served by the same API proxy as JSON requests.
+  return path;
 }
 
 export function uploadProfilePhoto(file: File) {
