@@ -3,6 +3,7 @@ import { db } from "../db/pool";
 import { getBoardName, notifyMake } from '../lib/notifyMake';
 import { TASK_OWNERSHIP_MESSAGE, checkTaskEditAccess } from "../lib/taskAccess";
 import { notifyAssignedUser, notifyTaskCreator } from "../lib/taskNotifications";
+import { canEditTaskDueDate } from "../lib/dueDateAccess";
 
 const router = Router();
 const allowedPriorities = ["Critical", "High", "Medium", "Low"];
@@ -30,7 +31,7 @@ async function refuseTaskEdit(req: Request, res: Response, taskId: unknown) {
   return false;
 }
 
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
   try {
     const result = await db.query(
       `SELECT
@@ -44,6 +45,7 @@ router.get("/", async (_req, res) => {
                json_build_object(
                  'id', u.id,
                  'full_name', u.full_name,
+                 'avatar_url', u.avatar_url,
                  'email', u.email,
                  'role', u.role
                )
@@ -85,6 +87,7 @@ router.get("/:id", async (req, res) => {
   SELECT
     u.id,
     u.full_name,
+    u.avatar_url,
     u.email,
     u.role,
     u.team_id,
@@ -138,6 +141,9 @@ router.post("/", async (req, res) => {
   const client = await db.connect();
   try {
     const { board_id, stage_id, title, description, priority, due_date, assignee_ids } = req.body;
+    if (due_date != null && due_date !== "" && !canEditTaskDueDate(req.user!.role)) {
+      return res.status(403).json({ success: false, message: "Team Members cannot set due dates." });
+    }
 
     if (!board_id || !stage_id || !title || typeof title !== "string" || !title.trim()) {
       return res.status(400).json({ success: false, message: "Board, stage and title are required" });
@@ -150,19 +156,18 @@ router.post("/", async (req, res) => {
 
     await client.query("BEGIN");
 
-    // Completed is a Team Lead / Manager / Coordinator decision, so a Team
-    // Member cannot drop a brand new task straight into it either.
+    // Team Members create tasks in the initial stage only.
     if (req.user!.role === "Team Member") {
       const targetStage = await client.query(
         "SELECT name FROM workflow_stages WHERE id = $1 LIMIT 1",
         [stage_id],
       );
 
-      if (targetStage.rows[0]?.name === "Completed") {
+      if (targetStage.rows[0]?.name !== "To Do") {
         await client.query("ROLLBACK");
         return res.status(403).json({
           success: false,
-          message: "Only a Team Lead, Manager or Coordinator can put a task in Completed",
+          message: "Team Members must create tasks in To Do",
         });
       }
     }
@@ -233,19 +238,19 @@ router.patch("/:id/status", async (req, res) => {
   const client = await db.connect();
 
   try {
-    if (req.user?.role !== "Team Member") {
+    if (!canEditTaskDueDate(req.user!.role)) {
       return res.status(403).json({
         success: false,
-        message: "This status action is for assigned Team Members",
+        message: "You cannot change workflow status",
       });
     }
 
     const { stage_name } = req.body;
 
-    if (!["To Do", "In Progress", "Waiting for Review"].includes(stage_name)) {
+    if (typeof stage_name !== "string" || !stage_name.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Team Members can only move assigned tasks through To Do, In Progress and Waiting for Review. Only a Team Lead, Manager or Coordinator can move a task to Completed",
+        message: "A valid stage name is required",
       });
     }
 
@@ -254,11 +259,10 @@ router.patch("/:id/status", async (req, res) => {
     const taskResult = await client.query(
       `SELECT t.id, t.board_id, t.stage_id, t.title, t.updated_at, t.created_by
        FROM tasks t
-       JOIN task_assignees ta ON ta.task_id = t.id
-       WHERE t.id = $1 AND ta.user_id = $2
+       WHERE t.id = $1
        LIMIT 1
        FOR UPDATE OF t`,
-      [req.params.id, req.user.id],
+      [req.params.id],
     );
 
     const task = taskResult.rows[0];
@@ -276,27 +280,6 @@ router.patch("/:id/status", async (req, res) => {
       [task.stage_id],
     );
     const currentStageName = currentStageResult.rows[0]?.name ?? "";
-
-    // Assignees walk the flow forward one stage at a time and may send a task
-    // back to any earlier stage. Completing a task is reserved for Team Leads,
-    // Managers and Coordinators, so the flow stops at Waiting for Review.
-    const allowedTransitions: Record<string, string[]> = {
-      "To Do": ["In Progress"],
-      "In Progress": ["To Do", "Waiting for Review"],
-      "Review": ["To Do", "In Progress"],
-      "Waiting for Lead": ["To Do", "In Progress"],
-      "Waiting for Review": ["To Do", "In Progress"],
-    };
-
-    const allowedNextStages = allowedTransitions[currentStageName] ?? [];
-
-    if (!allowedNextStages.includes(stage_name)) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        success: false,
-        message: "Task must follow: To Do -> In Progress -> Waiting for Review, and can move back to any earlier stage. A Team Lead, Manager or Coordinator marks it Completed",
-      });
-    }
 
     const stageLookupNames = stage_name === "Waiting for Review" ? reviewStageNames : [stage_name];
 
@@ -332,7 +315,7 @@ router.patch("/:id/status", async (req, res) => {
        VALUES ($1,$2,$3,$4::jsonb)`,
       [
         task.id,
-        req.user.id,
+        req.user!.id,
         "task_status_updated_by_assignee",
         JSON.stringify({ stage_name, previous_stage_name: currentStageName }),
       ],
@@ -344,7 +327,7 @@ router.patch("/:id/status", async (req, res) => {
       await notifyTaskCreator(
         {
           task,
-          actorId: req.user.id,
+          actorId: req.user!.id,
           type: "task_review_required",
           title: "Task waiting for review",
           message: `{actor} moved "${task.title}" to Waiting for Review, so it is waiting for your review.`,
@@ -357,7 +340,7 @@ router.patch("/:id/status", async (req, res) => {
       await notifyTaskCreator(
         {
           task,
-          actorId: req.user.id,
+          actorId: req.user!.id,
           type: "task_review_withdrawn",
           title: "Task moved back from review",
           message: `{actor} moved "${task.title}" back to ${stage_name}, so it is no longer waiting for your review.`,
@@ -368,7 +351,7 @@ router.patch("/:id/status", async (req, res) => {
       await notifyTaskCreator(
         {
           task,
-          actorId: req.user.id,
+          actorId: req.user!.id,
           type: "task_stage_changed",
           title: "Task moved to a new stage",
           message: `{actor} moved "${task.title}" from ${currentStageName || "another stage"} to ${stage_name}.`,
@@ -623,6 +606,9 @@ router.put("/:id/labels", async (req, res) => {
 });
 
 router.patch("/:id", async (req, res) => {
+  if (req.body.due_date !== undefined && !canEditTaskDueDate(req.user!.role)) {
+    return res.status(403).json({ success: false, message: "Only Admin, Manager, Coordinator or Team Lead can edit due dates." });
+  }
   if (await refuseTaskEdit(req, res, req.params.id)) return;
 
   const client = await db.connect();
@@ -659,36 +645,10 @@ router.patch("/:id", async (req, res) => {
     };
 
     const previousDueDate = normalizeDueDate(previousTask.due_date);
-    const requestedDueDate = normalizeDueDate(due_date);
-    const dueDateChangeRequested =
-      due_date !== undefined && previousDueDate !== requestedDueDate;
 
-    if (dueDateChangeRequested) {
-      const dueDateWasAlreadySet = Boolean(previousDueDate);
-
-      if (dueDateWasAlreadySet && req.user!.role !== "Manager") {
-        await client.query('ROLLBACK');
-        return res.status(403).json({
-          success: false,
-          message: "Only a Manager can change the due date after it has been saved",
-        });
-      }
-    }
-
-    // Team Members never set a stage directly, not even on tasks they created:
-    // their moves go through PATCH /:id/status, which keeps them on assigned
-    // tasks and stops at Waiting for Review.
-    if (
-      req.user!.role === "Team Member" &&
-      stage_id !== undefined &&
-      stage_id !== null &&
-      Number(stage_id) !== Number(previousTask.stage_id)
-    ) {
-      await client.query('ROLLBACK');
-      return res.status(403).json({
-        success: false,
-        message: "Team Members can only move tasks assigned to them, through To Do, In Progress and Waiting for Review. Only a Team Lead, Manager or Coordinator can move a task to Completed",
-      });
+    if (req.user!.role === "Team Member" && (stage_id !== undefined || board_id !== undefined)) {
+      await client.query("ROLLBACK");
+      return res.status(403).json({ success: false, message: "You cannot change workflow status or move tasks between boards." });
     }
 
     const result = await client.query(

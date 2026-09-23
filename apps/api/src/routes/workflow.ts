@@ -22,7 +22,7 @@ async function ensureArchiveSupport() {
       await db.query(
         `UPDATE workflow_stages
          SET is_system=TRUE
-         WHERE LOWER(TRIM(name)) IN ('to do','in progress','waiting for review','review','waiting for lead','completed')`
+         WHERE LOWER(TRIM(name)) IN ('to do','in progress','waiting for review','review','waiting for lead','for posting','completed')`
       );
       await db.query(
         "CREATE INDEX IF NOT EXISTS idx_workflow_stages_active_board ON workflow_stages (board_id, position) WHERE is_archived = FALSE"
@@ -104,8 +104,8 @@ router.post("/", async (req, res) => {
 
       // Newly created custom list is always the left-most custom list.
       const result = await client.query(
-        "INSERT INTO workflow_stages (board_id,name,position,created_by,is_system) VALUES ($1,$2,0,$3,FALSE) RETURNING *",
-        [boardId, name, req.user!.id],
+        "INSERT INTO workflow_stages (board_id,name,position,created_by,is_system) VALUES ($1,$2,0,$3,$4) RETURNING *",
+        [boardId, name, req.user!.id, ["to do", "in progress", "waiting for review", "review", "waiting for lead", "for posting", "completed"].includes(name.toLowerCase())],
       );
 
       await client.query("COMMIT");

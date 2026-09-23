@@ -1,0 +1,210 @@
+{
+  "defaultVersion": "build-1790157569838",
+  "versions": [
+    {
+      "version": "build-1790141986321",
+      "createdAt": "2026-09-22T10:59:50.536Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790141986321"
+    },
+    {
+      "version": "build-1790074864013",
+      "createdAt": "2026-09-22T11:02:12.398Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790074864013"
+    },
+    {
+      "version": "build-1790075239391",
+      "createdAt": "2026-09-22T11:08:09.826Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790075239391"
+    },
+    {
+      "version": "build-1790076446047",
+      "createdAt": "2026-09-22T11:28:16.482Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790076446047"
+    },
+    {
+      "version": "build-1790079099601",
+      "createdAt": "2026-09-22T12:12:24.730Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790079099601"
+    },
+    {
+      "version": "build-1790079405733",
+      "createdAt": "2026-09-22T12:17:33.911Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790079405733"
+    },
+    {
+      "version": "build-1790079537051",
+      "createdAt": "2026-09-22T12:20:01.774Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790079537051"
+    },
+    {
+      "version": "build-1790079798817",
+      "createdAt": "2026-09-22T12:24:29.353Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790079798817"
+    },
+    {
+      "version": "build-1790081634616",
+      "createdAt": "2026-09-22T12:54:45.522Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790081634616"
+    },
+    {
+      "version": "build-1790082165148",
+      "createdAt": "2026-09-22T13:03:33.778Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790082165148"
+    },
+    {
+      "version": "build-1790082814918",
+      "createdAt": "2026-09-22T13:14:22.107Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790082814918"
+    },
+    {
+      "version": "build-1790083637094",
+      "createdAt": "2026-09-22T13:28:23.730Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790083637094"
+    },
+    {
+      "version": "build-1790084007846",
+      "createdAt": "2026-09-22T13:34:15.053Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790084007846"
+    },
+    {
+      "version": "build-1790084382485",
+      "createdAt": "2026-09-22T13:40:59.675Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790084382485"
+    },
+    {
+      "version": "build-1790100041880",
+      "createdAt": "2026-09-22T18:01:34.270Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790100041880"
+    },
+    {
+      "version": "build-1790101800511",
+      "createdAt": "2026-09-22T18:31:01.572Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790101800511"
+    },
+    {
+      "version": "build-1790138486010",
+      "createdAt": "2026-09-23T04:42:53.540Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790138486010"
+    },
+    {
+      "version": "build-1790139012321",
+      "createdAt": "2026-09-23T04:50:58.375Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790139012321"
+    },
+    {
+      "version": "build-1790139371454",
+      "createdAt": "2026-09-23T04:57:04.197Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790139371454"
+    },
+    {
+      "version": "build-1790139528896",
+      "createdAt": "2026-09-23T04:59:31.525Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790139528896"
+    },
+    {
+      "version": "build-1790140251134",
+      "createdAt": "2026-09-23T05:11:55.534Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790140251134"
+    },
+    {
+      "version": "build-1790140318907",
+      "createdAt": "2026-09-23T05:12:54.417Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790140318907"
+    },
+    {
+      "version": "build-1790140795410",
+      "createdAt": "2026-09-23T05:20:38.760Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790140795410"
+    },
+    {
+      "version": "build-1790140955070",
+      "createdAt": "2026-09-23T05:23:22.547Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790140955070"
+    },
+    {
+      "version": "build-1790141819149",
+      "createdAt": "2026-09-23T05:37:41.561Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790141819149"
+    },
+    {
+      "version": "build-1790141986321",
+      "createdAt": "2026-09-23T05:40:26.940Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790141986321"
+    },
+    {
+      "version": "build-1790143571913",
+      "createdAt": "2026-09-23T06:07:08.073Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790143571913"
+    },
+    {
+      "version": "build-1790143712008",
+      "createdAt": "2026-09-23T06:09:16.719Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790143712008"
+    },
+    {
+      "version": "build-1790147916359",
+      "createdAt": "2026-09-23T07:20:30.241Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790147916359"
+    },
+    {
+      "version": "build-1790148866180",
+      "createdAt": "2026-09-23T07:35:48.478Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790148866180"
+    },
+    {
+      "version": "build-1790149488497",
+      "createdAt": "2026-09-23T07:45:54.026Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790149488497"
+    },
+    {
+      "version": "build-1790156520372",
+      "displayVersion": "v2.0.0",
+      "createdAt": "2026-09-23T09:43:36.857Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790156520372"
+    },
+    {
+      "version": "build-1790156697180",
+      "displayVersion": "v2.0.0",
+      "createdAt": "2026-09-23T09:45:58.037Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790156697180"
+    },
+    {
+      "version": "build-1790157398389",
+      "displayVersion": "v2.0.0",
+      "createdAt": "2026-09-23T09:58:13.341Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790157398389"
+    },
+    {
+      "version": "build-1790157569838",
+      "displayVersion": "v2.0.0",
+      "createdAt": "2026-09-23T10:00:57.961Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790157569838"
+    },
+    {
+      "version": "build-1790158808188",
+      "displayVersion": "v2.0.0",
+      "createdAt": "2026-09-23T10:21:43.912Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790158808188"
+    },
+    {
+      "version": "build-1790159119707",
+      "displayVersion": "v2.0.0",
+      "createdAt": "2026-09-23T10:27:03.293Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790159119707"
+    },
+    {
+      "version": "build-1790159538446",
+      "displayVersion": "v2.0.0",
+      "createdAt": "2026-09-23T10:34:22.520Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790159538446"
+    },
+    {
+      "version": "build-1790159841626",
+      "displayVersion": "v2.0.0",
+      "createdAt": "2026-09-23T10:38:56.508Z",
+      "path": "C:\\Users\\Chakor\\Downloads\\task-management-system-main\\task-management-system-main\\apps\\web\\.releases\\build-1790159841626"
+    }
+  ],
+  "latestVersion": "build-1790159841626",
+  "currentVersion": "build-1790157569838"
+}

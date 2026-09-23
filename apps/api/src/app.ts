@@ -14,6 +14,7 @@ import checklistRouter from "./routes/checklist";
 import activityRouter from "./routes/activity";
 import notificationsRouter from "./routes/notifications";
 import attachmentsRouter from "./routes/attachments";
+import profileRouter from "./routes/profile";
 import {
   preventTeamMemberWrites,
   requireAuth,
@@ -28,6 +29,9 @@ const app = express();
 app.disable("x-powered-by");
 
 app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
+// Own-profile uploads authenticate within this router, before JSON parsing and
+// role-specific task/admin write guards. Existing permissions are unchanged.
+app.use("/api/profile", profileRouter);
 
 // Comments can carry long write-ups, so they get a larger body budget than
 // the rest of the API. This parser has to run before the global 1mb one:

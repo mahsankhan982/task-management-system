@@ -9,7 +9,7 @@ const allowedRoles = ["Manager", "Coordinator", "Team Lead", "Team Member"];
 router.get("/", async (_req, res) => {
   try {
     const result = await db.query(
-      "SELECT id, full_name, email, role, team_id, is_active, created_at, updated_at FROM users ORDER BY full_name ASC"
+      "SELECT id, full_name, email, role, team_id, is_active, created_at, updated_at, avatar_url FROM users ORDER BY full_name ASC"
     );
     return res.status(200).json({ success: true, data: result.rows });
   } catch (error) {
@@ -37,7 +37,7 @@ router.post("/", async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12);
 
     const result = await db.query(
-      "INSERT INTO users (full_name, email, password_hash, role, team_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, full_name, email, role, team_id, is_active, created_at, updated_at",
+      "INSERT INTO users (full_name, email, password_hash, role, team_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, full_name, email, role, team_id, is_active, created_at, updated_at, avatar_url",
       [full_name.trim(), email.trim().toLowerCase(), passwordHash, role, team_id ?? null]
     );
 
@@ -89,7 +89,7 @@ router.patch("/:id", async (req, res) => {
            password_hash = COALESCE($7, password_hash),
            updated_at = NOW()
        WHERE id = $8
-       RETURNING id, full_name, email, role, team_id, is_active, created_at, updated_at`,
+       RETURNING id, full_name, email, role, team_id, is_active, created_at, updated_at, avatar_url`,
       [
         full_name === undefined ? null : full_name.trim(),
         email === undefined ? null : email.trim().toLowerCase(),

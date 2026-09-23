@@ -3,10 +3,10 @@ import { db } from "../db/pool";
 
 const router = Router();
 
-router.get("/", async (_req, res) => {
+router.get("/", async (req, res) => {
   try {
     const result = await db.query(
-      "SELECT a.*, u.full_name AS user_name FROM activity_logs a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.created_at DESC LIMIT 200"
+      "SELECT a.*, u.full_name AS user_name, u.avatar_url AS avatar_url FROM activity_logs a LEFT JOIN users u ON u.id = a.user_id ORDER BY a.created_at DESC LIMIT 200"
     );
 
     return res.status(200).json({ success: true, data: result.rows });
@@ -19,7 +19,7 @@ router.get("/", async (_req, res) => {
 router.get("/task/:taskId", async (req, res) => {
   try {
     const result = await db.query(
-      "SELECT a.*, u.full_name AS user_name FROM activity_logs a LEFT JOIN users u ON u.id = a.user_id WHERE a.task_id = $1 ORDER BY a.created_at DESC",
+      "SELECT a.*, u.full_name AS user_name, u.avatar_url AS avatar_url FROM activity_logs a LEFT JOIN users u ON u.id = a.user_id WHERE a.task_id = $1 ORDER BY a.created_at DESC",
       [req.params.taskId]
     );
 

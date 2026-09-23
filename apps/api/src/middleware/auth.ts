@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { db } from "../db/pool";
 
-export type UserRole = "Manager" | "Coordinator" | "Team Lead" | "Team Member";
+export type UserRole = "Admin" | "Manager" | "Coordinator" | "Team Lead" | "Team Member";
 
 export interface AuthUser {
   id: number;
@@ -79,7 +79,7 @@ const teamMemberOpenPrefixes = ["/api/comments", "/api/notifications", "/api/att
  * Task-scoped writes a Team Member is allowed to attempt. These are not waved
  * through: the route handlers behind them enforce per-task ownership with
  * `checkTaskEditAccess`, so a Team Member only ever changes tasks they created
- * (plus the status flow on tasks assigned to them).
+ * according to the existing ownership rules.
  */
 function isTeamMemberTaskWrite(method: string, rawPath: string) {
   const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, "") : rawPath;
@@ -89,9 +89,9 @@ function isTeamMemberTaskWrite(method: string, rawPath: string) {
     return true;
   }
 
-  // Move an assigned task along its status flow.
+  // Workflow changes are never permitted for Team Members.
   if (method === "PATCH" && /^\/api\/tasks\/\d+\/status$/.test(path)) {
-    return true;
+    return false;
   }
 
   // Edit / delete an owned task, and its assignees and labels.

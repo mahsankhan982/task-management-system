@@ -5,7 +5,7 @@ import type { AuthUser } from "../middleware/auth";
 /**
  * Team Members own the tasks they create: they may add tasks, assign them to
  * anyone, and edit their own tasks. Tasks raised by somebody else stay
- * read-only for them (apart from the assigned-task status flow, comments and
+ * read-only for them (apart from permitted checklist updates, comments and
  * attachments, which are handled by their own routes).
  */
 export const TASK_OWNERSHIP_MESSAGE =

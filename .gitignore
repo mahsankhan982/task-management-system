@@ -1,13 +1,23 @@
+# Dependencies and generated output
 **/node_modules/
 **/.next/
 **/dist/
 **/coverage/
-**/.env
-**/.env.local
-**/.env.*.local
 **/*.tsbuildinfo
+
+# Local environment files (keep distributable examples)
+**/.env
+**/.env.*
+!**/.env.example
+
+# Editor and operating-system files
 **/*.bak
+**/*.backup.*
 **/*.corrupt-backup
+**/*.tmp
+**/*.temp
+**/*.swp
+**/*~
 .DS_Store
 Thumbs.db
 
@@ -17,3 +27,22 @@ apps/api/api-error.log
 apps/api/api-start.log
 apps/web/web-dev-error.log
 apps/web/web-dev-out.log
+
+# Local backup folders
+.*-backup-*/
+
+# Local logs
+*.log
+
+# Local deployment metadata
+.vercel/
+
+# Recovery area and accidental shell artifacts
+.local-recovery/
+/cd
+/powershell
+/void
+/\{
+/`
+/deleteChecklist(item)\}
+/editChecklist(item)\}
