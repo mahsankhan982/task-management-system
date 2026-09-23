@@ -836,7 +836,9 @@ export default function BoardsPage() {
 
         {boards.length === 0 ? (
           <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-slate-500">
-            No boards found in the database.
+            {loading ? "Loading boards…" : error ? (
+              <><p>Board data could not be loaded. Please retry.</p><button type="button" className="mt-3 rounded-lg border px-4 py-2" onClick={() => { setLoading(true); void loadData(); }}>Retry</button></>
+            ) : "No boards found in the database."}
           </div>
         ) : (
           <div className="theme-board-canvas min-h-0 flex-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-[#DCE6EF]/90 p-3 pb-4 shadow-inner backdrop-blur-sm" ref={scrollContainerRef}>
@@ -985,7 +987,6 @@ export default function BoardsPage() {
     </div>
   );
 }
-
 
 
 

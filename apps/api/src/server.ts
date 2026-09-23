@@ -3,12 +3,13 @@ import http from "http";
 import { Server } from "socket.io";
 import { registerCalling } from "./calling";
 import { env } from "./config/env";
+import { allowedOrigins } from "./config/cors";
 
 const startServer = (): void => {
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: env.CLIENT_URL,
+      origin: allowedOrigins,
       credentials: true,
     },
   });

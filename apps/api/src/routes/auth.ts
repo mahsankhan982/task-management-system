@@ -296,7 +296,8 @@ router.get("/me", requireAuth, async (req, res) => {
         email,
         role,
         team_id,
-        is_active
+        is_active,
+        avatar_url
       FROM users
       WHERE id = $1
       LIMIT 1
@@ -321,7 +322,7 @@ router.get("/me", requireAuth, async (req, res) => {
         email: user.email,
         role: user.role,
         team_id: user.team_id === null ? null : Number(user.team_id),
-        avatar_url: null,
+        avatar_url: user.avatar_url ?? null,
       },
     });
   } catch (error) {

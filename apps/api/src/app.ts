@@ -2,6 +2,7 @@ import express, { type NextFunction, type Request, type Response } from "express
 import cors from "cors";
 
 import { env } from "./config/env";
+import { allowedOrigins } from "./config/cors";
 import authRouter from "./routes/auth";
 import teamsRouter from "./routes/teams";
 import usersRouter from "./routes/users";
@@ -28,7 +29,7 @@ const app = express();
 
 app.disable("x-powered-by");
 
-app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 // Own-profile uploads authenticate within this router, before JSON parsing and
 // role-specific task/admin write guards. Existing permissions are unchanged.
 app.use("/api/profile", profileRouter);

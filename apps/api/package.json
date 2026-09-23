@@ -10,7 +10,10 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:create-admin": "tsx src/scripts/bootstrap-admin.ts"
+    "db:create-admin": "tsx src/scripts/bootstrap-admin.ts",
+    "db:ensure-profile": "tsx src/scripts/ensure-profile-schema.ts",
+    "build:production": "npm run build && npm run db:ensure-profile && npm run verify:production",
+    "verify:production": "tsx src/scripts/verify-production-api.ts"
   },
   "keywords": [
     "task-management",
