@@ -12,6 +12,6 @@
   "env": {
     "NEXT_PUBLIC_API_URL": "https://task-management-system-ckgwaa04v-mahsankhan982s-projects.vercel.app"
   },
-  "buildCommand": "npm run build",
-  "installCommand": "npm install"
+
+
 }

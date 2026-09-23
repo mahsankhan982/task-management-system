@@ -50,3 +50,5 @@ dist/
 
 # Keep the documented example env in version control.
 !.env.example
+
+.vercel

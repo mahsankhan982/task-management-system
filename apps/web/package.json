@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "node scripts/release-build.js",
+    "build": "next build --webpack",
     "start": "node scripts/release-server.js",
     "lint": "eslint",
     "build:legacy": "next build --webpack"
