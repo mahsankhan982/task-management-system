@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { memo, useState, useSyncExternalStore } from "react";
 import { profileImageUrl } from "@/lib/api";
 
-export type AvatarUser = { id?: number | string | null; full_name: string; avatar_url?: string | null };
+export type AvatarUser = { id?: number | string | null; full_name: string; avatar_url?: string | null; role?: string | null; email?: string | null };
 const eventName = "chakor-profile-photo";
 const updatedPhotos = new Map<string, string>();
 
@@ -25,7 +25,7 @@ function readPhoto(id: AvatarUser["id"]): string {
   return updatedPhotos.get(String(id)) || "";
 }
 
-export default function UserAvatar({ user, size = 36, className = "" }: {
+function UserAvatar({ user, size = 36, className = "" }: {
   user: AvatarUser; size?: number; className?: string;
 }) {
   const updatedPhoto = useSyncExternalStore(subscribe, () => readPhoto(user.id), () => "");
@@ -33,13 +33,15 @@ export default function UserAvatar({ user, size = 36, className = "" }: {
   const [failedPhoto, setFailedPhoto] = useState("");
   const initials = user.full_name.trim().split(/\s+/).slice(0, 2).map(part => part[0] || "").join("").toUpperCase() || "?";
   return (
-    <span title={user.full_name} style={{ width: size, height: size, fontSize: Math.max(10, size / 3) }}
-      className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#D8BF80]/70 bg-gradient-to-br from-[#0B2135] to-[#1B4A6C] font-semibold text-white shadow-[0_0_10px_rgba(201,174,109,0.15)] ${className}`}>
+    <span title={[user.full_name, user.role, user.email].filter(Boolean).join("\n")} aria-label={[user.full_name, user.role].filter(Boolean).join(", ")} style={{ width: size, height: size, fontSize: Math.max(10, size / 3) }}
+      className={`user-avatar inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#D8BF80]/70 bg-gradient-to-br from-[#0B2135] to-[#1B4A6C] font-semibold text-white shadow-[0_0_10px_rgba(201,174,109,0.15)] ${className}`}>
       {photo && failedPhoto !== photo ? (
         // Uploaded data URLs and API-hosted images need no Next image optimization.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={photo} alt={user.full_name} className="h-full w-full object-cover" onError={() => setFailedPhoto(photo)} />
+        <img src={photo} alt={user.full_name} decoding="async" className="h-full w-full object-cover" onError={() => setFailedPhoto(photo)} />
       ) : <span aria-label={user.full_name}>{initials}</span>}
     </span>
   );
 }
+
+export default memo(UserAvatar);

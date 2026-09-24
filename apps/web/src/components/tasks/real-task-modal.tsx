@@ -1,5 +1,7 @@
 "use client";
 
+import { formatLocalDateTime } from "@/lib/date-time";
+
 import UserAvatar from "@/components/profile/user-avatar";
 
 import type { FormEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -167,8 +169,7 @@ const backwardStagesByStage: Record<string, AssigneeStage[]> = {
 
 function formatDate(value: string | null) {
   if (!value) return "Not set";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return formatLocalDateTime(value);
 }
 
 /**
@@ -203,6 +204,7 @@ export default function RealTaskModal({
   const [task, setTask] = useState<TaskDetails | null>(null);
   const [workflow, setWorkflow] = useState<WorkflowStage[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
+  const usersById = useMemo(() => new Map(users.map(person => [String(person.id), person])), [users]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority>("Medium");
@@ -1113,10 +1115,6 @@ export default function RealTaskModal({
     commentFormRef.current?.requestSubmit();
   }
 
-  // Do not render a separate modal shell while task details are loading.
-  // This prevents the temporary "Loading task" popup from appearing before
-  // the real task modal when a notification is opened.
-  if (loading) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/55 p-2 backdrop-blur-md sm:p-4">
@@ -1127,21 +1125,22 @@ export default function RealTaskModal({
         className="absolute inset-0"
       />
 
-      <div className="relative z-10 flex h-[calc(100dvh-1rem)] min-h-0 min-w-0 w-full max-w-[min(64rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-3xl border border-violet-100 bg-slate-50 shadow-[0_28px_80px_-24px_rgba(22,31,69,0.7)] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-[min(64rem,calc(100vw-2rem))]">
+      <div role="dialog" aria-modal="true" aria-labelledby="task-detail-title" className="task-detail-panel relative z-10 flex h-[calc(100dvh-1rem)] min-h-0 min-w-0 w-full max-w-[min(64rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-3xl border border-violet-100 bg-slate-50 shadow-[0_28px_80px_-24px_rgba(22,31,69,0.7)] sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-[min(64rem,calc(100vw-2rem))]">
         <div className="h-1 shrink-0 bg-gradient-to-r from-[#161f45] via-violet-600 to-sky-500" />
-        <div className="z-20 flex shrink-0 items-start justify-between border-b border-violet-100 bg-gradient-to-r from-white via-violet-50/40 to-sky-50/70 px-5 py-4 sm:px-7">
+        <div className="task-detail-heading z-20 flex shrink-0 items-start justify-between border-b border-violet-100 bg-gradient-to-r from-white via-violet-50/40 to-sky-50/70 px-5 py-4 sm:px-7">
           <div className="flex min-w-0 flex-1 items-center gap-3.5">
             <ChakorLogo size={42} rounded="rounded-xl" priority className="ring-4 ring-white shadow-md" />
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-violet-600">
                 Chakor Task Management
               </p>
-              <h2 className="mt-1 truncate text-xl font-bold tracking-tight text-[#161f45]">
+              <h2 id="task-detail-title" title={task?.title} className="mt-1 line-clamp-2 text-xl font-bold tracking-tight text-[#161f45]">
                 {task?.title ?? "Loading task..."}
               </h2>
 
               {task ? (
-                <p className="mt-1 truncate text-xs text-slate-500">
+                <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                  <UserAvatar user={usersById.get(String(task.created_by)) ?? { full_name: task.created_by_name ?? "Former member" }} size={24} />
                   Created by{" "}
                   <span className="font-semibold text-slate-700">
                     {isMyTask ? "you" : task.created_by_name ?? "Unknown"}
@@ -1320,18 +1319,21 @@ export default function RealTaskModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+              aria-label="Close task"
+              className="task-close flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
             >
               <X size={19} />
             </button>
           </div>
         </div>
 
-        {error && !task ? (
+        {loading ? (
+          <div role="status" className="task-loading p-8"><Loader2 size={22} className="mb-4 animate-spin" /><p>Loading task details...</p><div className="mt-5 h-24 rounded-xl border opacity-30" /></div>
+        ) : error && !task ? (
           <div className="p-8 text-sm text-red-600">{error}</div>
         ) : task ? (
-          <div className="grid min-h-0 w-full max-w-full flex-1 grid-cols-1 gap-3 overflow-x-hidden overflow-y-auto bg-gradient-to-br from-[#5c3d8c] via-[#914eaa] to-[#c55bb5] p-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,.7fr)]">
-            <section className="min-w-0 max-w-full overflow-x-hidden rounded-2xl border border-white/50 bg-gradient-to-br from-white via-white to-violet-50/60 p-5 shadow-xl shadow-violet-950/15 sm:p-6 lg:p-7">
+          <div className="task-detail-body grid min-h-0 w-full max-w-full flex-1 grid-cols-1 gap-3 overflow-x-hidden overflow-y-auto bg-gradient-to-br from-[#5c3d8c] via-[#914eaa] to-[#c55bb5] p-3 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,.7fr)]">
+            <section className="task-detail-fields min-w-0 max-w-full overflow-x-hidden rounded-2xl border border-white/50 bg-gradient-to-br from-white via-white to-violet-50/60 p-5 shadow-xl shadow-violet-950/15 sm:p-6 lg:p-7">
               {error ? (
                 error.includes("Team Members cannot perform this action") ? (
                   <div className="mb-5 flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3.5 text-sm font-medium text-violet-800 shadow-sm">
@@ -1828,7 +1830,7 @@ export default function RealTaskModal({
               </div>
             </section>
 
-            <aside className="min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-auto rounded-2xl border border-white/55 bg-gradient-to-b from-violet-50/95 via-white to-sky-50/95 p-4 shadow-xl shadow-violet-950/15 sm:p-5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-8rem)] lg:self-start">
+            <aside className="task-detail-conversation min-h-0 min-w-0 max-w-full overflow-x-hidden overflow-y-auto rounded-2xl border border-white/55 bg-gradient-to-b from-violet-50/95 via-white to-sky-50/95 p-4 shadow-xl shadow-violet-950/15 sm:p-5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-8rem)] lg:self-start">
               <div className="overflow-hidden rounded-2xl border border-violet-100 bg-white shadow-[0_12px_32px_-20px_rgba(76,29,149,0.45)]">
                 <div className="relative flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
                   {selectedChatUser ? (
@@ -1912,7 +1914,7 @@ export default function RealTaskModal({
 
                 <div
                   ref={chatScrollRef}
-                  className="h-[clamp(12rem,32vh,270px)] space-y-2 overflow-y-auto scroll-smooth bg-gradient-to-b from-violet-50/50 via-slate-50 to-sky-50/60 px-3 py-3"
+                  className="task-chat-scroll h-[clamp(16rem,38vh,360px)] space-y-2 overflow-y-auto scroll-smooth bg-gradient-to-b from-violet-50/50 via-slate-50 to-sky-50/60 px-3 py-3"
                   onClick={() => setOpenMessageMenuId(null)}
                 >
                 {conversationLoading ? (
@@ -1934,9 +1936,10 @@ export default function RealTaskModal({
 
                     return (
                     <div key={String(entry.id)} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                      <div className="relative flex max-w-[92%] items-start gap-1">
+                      <div className="relative flex max-w-[96%] items-start gap-2">
+                      <UserAvatar user={usersById.get(String(entry.user_id)) ?? { id: entry.user_id, full_name: entry.user_name ?? "Former member", role: entry.user_role }} size={32} />
                       <div
-                        className={`relative rounded-xl border px-3 py-2 shadow-sm ${
+                        data-own={isMine} className={`task-message relative rounded-xl border px-3 py-2 shadow-sm ${
                           isMine
                             ? "border-violet-200 bg-gradient-to-br from-violet-100 to-indigo-50 text-slate-800"
                             : "border-slate-200 bg-white text-slate-800"
@@ -2047,7 +2050,7 @@ export default function RealTaskModal({
                           <div className="mt-1 flex items-center justify-end gap-1.5 text-[10px] text-slate-500">
                             {wasEdited ? <span>Edited</span> : null}
                             <time dateTime={entry.created_at}>
-                              {new Date(entry.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              {formatLocalDateTime(entry.created_at)}
                             </time>
                           </div>
                         </>
@@ -2197,7 +2200,7 @@ export default function RealTaskModal({
                     <p className="text-sm text-slate-500">No activity yet.</p>
                   ) : (
                     task.activity.map((entry) => (
-                      <div key={String(entry.id)} className="rounded-xl border bg-white p-3">
+                      <div key={String(entry.id)} className="task-activity-entry rounded-xl border bg-white p-3">
                         <p className="text-sm text-slate-700">
                           <span className="font-semibold">{entry.user_name || "System"}</span>{" "}
                          {entry.action === "task_assignees_updated" && entry.details?.assignee_names

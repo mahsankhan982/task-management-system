@@ -169,10 +169,12 @@ export default function BoardNavPanels({
   boards,
   selectedBoardId,
   onSelectBoard,
+  handleTaskLinks = true,
 }: {
   boards: Board[];
   selectedBoardId: number | null;
   onSelectBoard: (id: number) => void;
+  handleTaskLinks?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -196,7 +198,8 @@ export default function BoardNavPanels({
     return Number.isInteger(taskId) && taskId > 0 ? taskId : null;
   }, [taskFromUrl]);
 
-  const activeTaskId = selectedTaskId ?? taskIdFromUrl;
+  // The board page owns URL task links; avoid mounting a second modal there.
+  const activeTaskId = selectedTaskId ?? (handleTaskLinks ? taskIdFromUrl : null);
 
   const filteredBoards = useMemo(() => {
     const q = query.trim().toLowerCase();

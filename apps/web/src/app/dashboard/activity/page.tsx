@@ -1,5 +1,7 @@
 "use client";
 
+import { formatLocalDateTime } from "@/lib/date-time";
+
 import UserAvatar from "@/components/profile/user-avatar";
 
 import {
@@ -113,24 +115,7 @@ function describe(entry: RawActivity) {
   return entry.action.replaceAll("_", " ");
 }
 
-function timeAgo(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (seconds < 60) return "Just now";
-
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min${minutes === 1 ? "" : "s"} ago`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hr${hours === 1 ? "" : "s"} ago`;
-
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} day${days === 1 ? "" : "s"} ago`;
-
-  return date.toLocaleString();
-}
+function timeAgo(value: string) { return formatLocalDateTime(value); }
 
 export default function ActivityPage() {
   const [entries, setEntries] = useState<RawActivity[]>([]);

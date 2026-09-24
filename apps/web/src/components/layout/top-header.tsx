@@ -1,5 +1,7 @@
 "use client";
 
+import { formatLocalDateTime } from "@/lib/date-time";
+
 import {
   ArrowLeft,
   Bell,
@@ -62,7 +64,7 @@ const getPageTitle = (pathname: string) => {
 function formatTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString();
+  return formatLocalDateTime(value);
 }
 
 export default function TopHeader() {
@@ -373,10 +375,10 @@ export default function TopHeader() {
         <ChakorLogo size={32} priority />
 
         <div className="min-w-0 leading-tight">
-          <p className="truncate text-sm font-bold text-slate-900">
+          <p className="header-brand truncate text-sm font-bold">
             Task Manager
           </p>
-          <p className="text-[10px] text-slate-400">{pageTitle}</p>
+          <p className="header-subtitle text-[10px]">{pageTitle}</p>
         </div>
       </Link>
 

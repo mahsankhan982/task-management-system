@@ -60,7 +60,7 @@ type Task = {
   stage_name: string;
   created_by: number | null;
   created_by_name: string | null;
-  assignees: Array<{ id: number; full_name: string; avatar_url?: string | null }>;
+  assignees: Array<{ id: number; full_name: string; role?: string; email?: string; avatar_url?: string | null }>;
 };
 
 const stageIcons = {
@@ -635,7 +635,7 @@ export default function BoardsPage() {
 
   return (
     <div className="theme-page flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden p-3 md:p-4">
-      <BoardNavPanels boards={boards} selectedBoardId={selectedBoardId} onSelectBoard={(id) => setSelectedBoardId(id)} />
+      <BoardNavPanels handleTaskLinks={false} boards={boards} selectedBoardId={selectedBoardId} onSelectBoard={(id) => setSelectedBoardId(id)} />
       <div className="mx-auto flex min-h-0 w-full flex-1 flex-col max-w-none">
         <div className="theme-board-heading mb-3 flex flex-col gap-3 rounded-2xl border border-white/10 bg-gradient-to-r from-[#071827] via-[#0E304A] to-[#184967] p-4 text-white shadow-2xl shadow-black/20 backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -910,7 +910,7 @@ export default function BoardsPage() {
                               {task.assignees?.length > 0 && (
                                 <div className="flex -space-x-1.5">
                                   {task.assignees.map((a) => (
-                                    <UserAvatar key={a.id} user={a} size={28} />
+                                    <UserAvatar key={a.id} user={a} size={34} />
                                   ))}
                                 </div>
                               )}
@@ -968,7 +968,6 @@ export default function BoardsPage() {
     </div>
   );
 }
-
 
 
 
