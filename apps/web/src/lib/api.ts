@@ -107,7 +107,7 @@ export const api = {
       body: JSON.stringify({ reset_token, new_password }),
     }),
 
-  me: () => apiRequest("/auth/me"),
+  me: () => apiRequest("/auth/profile"),
   teams: () => apiRequest("/teams"),
   users: () => apiRequest("/users"),
   boards: () => apiRequest("/boards"),

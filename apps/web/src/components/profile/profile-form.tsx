@@ -5,7 +5,7 @@ import { useRole } from "@/contexts/role-context";
 import { apiRequest, uploadProfilePhoto } from "@/lib/api";
 import UserAvatar, { publishProfilePhoto } from "./user-avatar";
 
-export default function ProfileForm({ onCancel, photoFirst = false }: { onCancel: () => void; photoFirst?: boolean }) {
+export default function ProfileForm({ onCancel, focusField }: { onCancel: () => void; focusField?: "photo" | "name" | "email" }) {
   const { user, updateProfile, updateAvatar } = useRole();
   const [name, setName] = useState(user.full_name);
   const [email, setEmail] = useState(user.email);
@@ -29,7 +29,7 @@ export default function ProfileForm({ onCancel, photoFirst = false }: { onCancel
     try {
       if (!name.trim()) throw new Error("Enter your full name.");
       if (name.trim() !== user.full_name) {
-        const response = await apiRequest<{ data: { full_name: string; email: string } }>("/profile/me", { method: "PATCH", body: JSON.stringify({ full_name: name.trim() }) });
+        const response = await apiRequest<{ data: { full_name: string; email: string } }>("/auth/profile", { method: "PATCH", body: JSON.stringify({ full_name: name.trim() }) });
         updateProfile(response.data); setName(response.data.full_name); saved.push("Name");
       }
       if (photo) {
@@ -53,15 +53,15 @@ export default function ProfileForm({ onCancel, photoFirst = false }: { onCancel
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {preview ? <img src={preview} alt="New profile photo preview" className="h-24 w-24 rounded-full border border-amber-200/50 object-cover" /> : <UserAvatar user={user} size={96} />}
       </div>
-      <label>Profile picture<input autoFocus={photoFirst} type="file" accept="image/jpeg,image/png,image/webp" onChange={event => {
+      <label>Profile picture<input autoFocus={focusField === "photo"} type="file" accept="image/jpeg,image/png,image/webp" onChange={event => {
         const file = event.target.files?.[0]; event.target.value = ""; setPhoto(null); setError(""); setNotice("");
         if (!file) return;
         if (!["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024) { setError("Choose a JPG, PNG or WEBP image under 5 MB."); return; }
         setPhoto(file);
       }} /></label>
       <p className="mb-5 text-xs opacity-75">JPG, PNG or WEBP, up to 5 MB.</p>
-      <label>Full name<input name="full_name" autoComplete="name" value={name} onChange={event => setName(event.target.value)} required maxLength={120} /></label>
-      <label>Email<input name="email" type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required maxLength={254} /></label>
+      <label>Full name<input autoFocus={focusField === "name"} name="full_name" autoComplete="name" value={name} onChange={event => setName(event.target.value)} required maxLength={120} /></label>
+      <label>Email<input autoFocus={focusField === "email"} name="email" type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} required maxLength={254} /></label>
       <p className="text-xs opacity-75">A new email address must be verified before it replaces your current address.</p>
     </fieldset>
     {error && <p role="alert" className="text-sm text-red-400">{error}</p>}

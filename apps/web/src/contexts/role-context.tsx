@@ -59,7 +59,6 @@ export function RoleProvider({ children }: { children: ReactNode }) {
 
         setUser(response.data);
         setRole(response.data.role);
-        localStorage.setItem("task_management_user", JSON.stringify(response.data));
       } catch {
         clearAuthToken();
         localStorage.removeItem("task_management_user");
@@ -71,6 +70,11 @@ export function RoleProvider({ children }: { children: ReactNode }) {
 
     loadUser();
   }, []);
+
+  // Persist display changes without refetching dashboard data.
+  useEffect(() => {
+    if (user) localStorage.setItem("task_management_user", JSON.stringify(user));
+  }, [user]);
 
   if (loading || !user) {
     return (

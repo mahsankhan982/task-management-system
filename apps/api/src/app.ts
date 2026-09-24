@@ -33,6 +33,7 @@ app.use(cors({ origin: allowedOrigins, credentials: true }));
 // Own-profile uploads authenticate within this router, before JSON parsing and
 // role-specific task/admin write guards. Existing permissions are unchanged.
 app.use("/api/profile", profileRouter);
+app.use("/api/auth/profile", profileRouter);
 
 // Comments can carry long write-ups, so they get a larger body budget than
 // the rest of the API. This parser has to run before the global 1mb one:

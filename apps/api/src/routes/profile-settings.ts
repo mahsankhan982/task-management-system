@@ -20,7 +20,16 @@ export function createProfileSettingsRouter(deliver = sendEmail) {
   const router = Router();
   router.use(requireAuth, express.json({ limit: "16kb" }));
 
-  router.patch("/me", async (req, res) => {
+  router.get("/", async (req, res) => {
+    try {
+      const result = await db.query(`SELECT ${publicFields} FROM users WHERE id=$1 AND is_active=TRUE`, [req.user!.id]);
+      if (!result.rows[0]) return res.status(401).json({ message: "User not available" });
+      res.set("Cache-Control", "private, no-store");
+      return res.json({ success: true, data: result.rows[0] });
+    } catch { return res.status(500).json({ message: "Unable to load profile." }); }
+  });
+
+  router.patch(["/", "/me"], async (req, res) => {
     const body = req.body ?? {};
     if (Object.keys(body).some(key => key !== "full_name")) return res.status(400).json({ message: "Only your full name can be edited here. Email changes require verification." });
     const { full_name } = body;
