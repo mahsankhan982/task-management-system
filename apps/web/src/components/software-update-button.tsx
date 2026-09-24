@@ -24,8 +24,9 @@ export default function SoftwareUpdateButton() {
       checking = true;
       try {
         let next: Update | null = null;
-        const response = await fetch("/__release-info?t=" + Date.now(), { cache: "no-store", signal: controller.signal });
-        if (response.ok && response.headers.get("content-type")?.includes("application/json")) {
+        const response = process.env.NEXT_PUBLIC_RELEASE_GATEWAY === "false" ? null
+          : await fetch("/__release-info?t=" + Date.now(), { cache: "no-store", signal: controller.signal });
+        if (response?.ok && response.headers.get("content-type")?.includes("application/json")) {
           const info = await response.json();
           if (typeof info.latestVersion !== "string") return;
           // Compare loaded assets, not just the cookie, which another tab can change.
