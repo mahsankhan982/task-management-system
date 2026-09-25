@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { verifyTaskMoves } from "./verify-task-moves";
 import { db } from "../db/pool";
 
 /** Tests only disposable boards owned by the temporary verification account. */
@@ -41,6 +42,7 @@ export async function verifyBoardFlow(userId: number, email: string, password: s
       const positions = await db.query("SELECT position FROM workflow_stages WHERE board_id=$1", [board_id]);
       assert.equal(new Set(positions.rows.map(row => row.position)).size, positions.rows.length);
     }
+    if (process.env.VERIFY_TASK_MOVES === "1") await verifyTaskMoves(boardIds[0], userId, email, password);
     console.log("Verified board creation, cross-board names, same-board duplicates, rename conflicts, distinct positions, and concurrent For Posting initialization.");
   } finally {
     // A timed-out create may have committed: identify fixtures by both owner and nonce.

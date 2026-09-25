@@ -3,6 +3,7 @@
 import UserAvatar from "@/components/profile/user-avatar";
 
 import {
+  Loader2,
   CalendarDays,
   CheckCircle2,
   CircleDot,
@@ -18,7 +19,7 @@ import { useEffect, useMemo, useState, useRef, type DragEvent, type FormEvent } 
 import { useSearchParams } from "next/navigation";
 import { api, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
-import { canEditTaskDueDate, isTaskCreator } from "@/lib/permissions";
+import { canMoveTask, canEditTaskDueDate, isTaskCreator } from "@/lib/permissions";
 import RealTaskModal from "@/components/tasks/real-task-modal";
 import BoardNavPanels from "@/components/boards/board-nav-panels";
 
@@ -139,6 +140,11 @@ export default function BoardsPage() {
   const [createStageId, setCreateStageId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
+  const [dropStageId, setDropStageId] = useState<number | null>(null);
+  const [movingTaskId, setMovingTaskId] = useState<number | null>(null);
+  const moveInFlight = useRef(false);
+  const [moveNotice, setMoveNotice] = useState("");
+  useEffect(() => { if (!moveNotice) return; const timer = window.setTimeout(() => setMoveNotice(""), 4000); return () => window.clearTimeout(timer); }, [moveNotice]);
   const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
   const [selectedTaskInitialEdit, setSelectedTaskInitialEdit] = useState(false);
 
@@ -415,23 +421,25 @@ export default function BoardsPage() {
     if (!task || !targetStage) return;
     const targetStageName = normalizeStageName(targetStage.name);
 
-    if (!permissions.moveTask) return;
-
-    const previous = tasks;
-    setTasks((current) => current.map((item) => item.id === taskId ? { ...item, stage_id: stageId, stage_name: targetStageName } : item));
+    if (!canMoveTask(role, user.id, task) || moveInFlight.current || Number(task.stage_id) === stageId) return;
+    moveInFlight.current = true;
+    setMovingTaskId(taskId); setMoveNotice("");
+    setTasks(current => current.map(item => item.id === taskId ? { ...item, stage_id: stageId, stage_name: targetStageName } : item));
     try {
-      await apiRequest(`/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify({ stage_id: stageId }) });
+      const response = await apiRequest<{ data: Partial<Task> }>("/tasks/" + taskId + "/status", { method: "PATCH", body: JSON.stringify({ stage_id: stageId }) });
+      setTasks(current => current.map(item => item.id === taskId ? { ...item, stage_id: Number(response.data.stage_id ?? stageId), stage_name: response.data.stage_name ?? targetStageName } : item));
       setError("");
+      setMoveNotice("Task #" + taskId + " moved to " + targetStageName + ".");
     } catch (err) {
-      setTasks(previous);
+      setTasks(current => current.map(item => item.id === taskId ? task : item));
       setError(err instanceof Error ? err.message : "Unable to move task");
-    }
+    } finally { moveInFlight.current = false; setMovingTaskId(null); setDropStageId(null); }
   }
 
   function handleDragStart(event: DragEvent<HTMLElement>, taskId: number) {
     const task = tasks.find((item) => item.id === taskId);
     if (!task) { event.preventDefault(); return; }
-    if (!permissions.moveTask) { event.preventDefault(); return; }
+    if (!canMoveTask(role, user.id, task) || moveInFlight.current) { event.preventDefault(); return; }
     setDraggedTaskId(taskId);
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", String(taskId));
@@ -635,6 +643,7 @@ export default function BoardsPage() {
 
   return (
     <div className="theme-page flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden p-3 md:p-4">
+      {moveNotice && <div role="status" className="board-move-notice fixed bottom-5 right-5 z-[110] rounded-xl border px-5 py-3 text-sm shadow-xl">{moveNotice}</div>}
       <BoardNavPanels handleTaskLinks={false} boards={boards} selectedBoardId={selectedBoardId} onSelectBoard={(id) => setSelectedBoardId(id)} />
       <div className="mx-auto flex min-h-0 w-full flex-1 flex-col max-w-none">
         <div className="theme-board-heading mb-3 flex flex-col gap-3 rounded-2xl border border-white/10 bg-gradient-to-r from-[#071827] via-[#0E304A] to-[#184967] p-4 text-white shadow-2xl shadow-black/20 backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
@@ -750,7 +759,9 @@ export default function BoardsPage() {
             >
               {creatableWorkflow.map((stage) => (
                 <option key={stage.id}
-                    data-stage={stage.name} value={stage.id}>
+                    data-stage={stage.name}
+                    data-drop-active={dropStageId === stage.id}
+                    onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropStageId(null); }} value={stage.id}>
                   {stage.name}
                 </option>
               ))}
@@ -816,8 +827,8 @@ export default function BoardsPage() {
         </div>
 
         {boards.length === 0 ? (
-          <div className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm text-slate-500">
-            {loading ? "Loading boards…" : error ? (
+          <div className="theme-glass rounded-2xl border border-dashed p-6 text-center text-sm text-[var(--theme-muted)]">
+            {loading ? <div role="status"><p>Loading your workspace...</p><div aria-hidden="true" className="mt-5 grid grid-cols-3 gap-4">{[1,2,3].map(item => <div key={item} className="h-48 rounded-xl border border-current/15 bg-current/5 motion-safe:animate-pulse" />)}</div></div> : error ? (
               <><p>Board data could not be loaded. Please retry.</p><button type="button" className="mt-3 rounded-lg border px-4 py-2" onClick={() => { setLoading(true); void loadData(); }}>Retry</button></>
             ) : "No boards found in the database."}
           </div>
@@ -833,16 +844,17 @@ export default function BoardsPage() {
                     key={stage.id}
                     data-stage={stage.name}
                     onDragOver={(event) => {
-                      if (!permissions.moveTask) return;
+                      if (draggedTaskId === null || movingTaskId !== null) return;
                       event.preventDefault();
                       event.dataTransfer.dropEffect = "move";
+                      setDropStageId(stage.id);
                     }}
                     onDrop={(event) => {
-                      if (!permissions.moveTask) return;
+                      if (draggedTaskId === null || movingTaskId !== null) return;
                       event.preventDefault();
                       const taskId = draggedTaskId ?? Number(event.dataTransfer.getData("text/plain"));
                       if (taskId) moveTask(taskId, stage.id);
-                      setDraggedTaskId(null);
+                      setDraggedTaskId(null); setDropStageId(null);
                     }}
                     className="theme-column flex h-full max-h-full w-[285px] shrink-0 flex-col rounded-2xl border border-[#DCE5EC] bg-gradient-to-br from-white to-[#F8FBFD]/95 p-3 shadow-xl shadow-slate-950/10"
                   >
@@ -865,13 +877,15 @@ export default function BoardsPage() {
                       {stageTasks.map((task) => (
                         <article
                           key={task.id}
-                          draggable={permissions.moveTask}
+                          draggable={canMoveTask(role, user.id, task) && movingTaskId === null}
+                          data-dragging={draggedTaskId === task.id}
+                          aria-busy={movingTaskId === task.id}
                           onClick={() => {
                             setSelectedTaskInitialEdit(false);
                             setSelectedTaskId(task.id);
                           }}
                           onDragStart={(event) => handleDragStart(event, task.id)}
-                          onDragEnd={() => setDraggedTaskId(null)}
+                          onDragEnd={() => { setDraggedTaskId(null); setDropStageId(null); }}
                           data-due={getDueState(task)}
                           className={`theme-task cursor-pointer rounded-xl border border-l-4 p-3.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-[#1B4A6C] hover:shadow-[0_10px_24px_rgba(15,23,42,0.10)] ${priorityBorderClass[task.priority]} ${getDueState(task) === "overdue" ? "!border-[#D2AA5D] bg-[#FFF9EE] shadow-[0_8px_20px_rgba(11,39,64,0.07)]" : getDueState(task) === "today" ? "!border-[#7EA8C3] bg-[#F2F8FB] shadow-[0_8px_20px_rgba(11,39,64,0.07)]" : "border-[#CADBE5] bg-gradient-to-br from-[#FCFDFE] to-[#EEF5F8] shadow-[0_8px_20px_rgba(11,39,64,0.07)]"}`}
                         >
@@ -914,7 +928,7 @@ export default function BoardsPage() {
                                   ))}
                                 </div>
                               )}
-                              <span>#{task.id}</span>
+                              <span className="flex items-center gap-1">{movingTaskId === task.id && <Loader2 aria-label="Saving task stage" size={14} className="animate-spin" />}#{task.id}</span>
                             </div>
                           </div>
                         </article>

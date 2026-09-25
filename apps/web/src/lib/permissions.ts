@@ -101,3 +101,11 @@ export function getTaskPermissions(
     deleteTask: owns,
   };
 }
+
+/** Movement is task-specific; it does not grant edit, due-date or list permissions. */
+export function canMoveTask(role: UserRole, userId: number | string, task: {
+  created_by?: number | string | null; assignees?: ReadonlyArray<{ id: number | string }>;
+}): boolean {
+  return getPermissions(role).moveTask || isTaskCreator(userId, task.created_by) ||
+    Boolean(task.assignees?.some(person => Number(person.id) === Number(userId)));
+}

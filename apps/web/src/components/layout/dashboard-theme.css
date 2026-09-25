@@ -223,3 +223,17 @@
   .chakor-theme .task-detail-fields { margin-bottom: 16px; overflow: visible; }
   .chakor-theme .task-detail-conversation { overflow: visible; }
 }
+/* Workflow feedback remains subtle and honors both theme palettes. */
+.chakor-theme .theme-column { transition: border-color .18s ease, box-shadow .18s ease; }
+.chakor-theme .theme-column[data-drop-active="true"] { outline: 2px solid var(--theme-accent); outline-offset: -2px; box-shadow: inset 0 0 36px #d7b97120, 0 12px 32px #00081430; }
+.chakor-theme .theme-column[data-drop-active="true"] > div:first-child::after { content: "Drop here"; font-size: 10px; color: var(--theme-accent); white-space: nowrap; }
+.chakor-theme .theme-task[draggable="true"] { cursor: grab; }
+.chakor-theme .theme-task[data-dragging="true"] { opacity: .45; transform: rotate(-1deg) scale(.97); }
+.chakor-theme .theme-task[aria-busy="true"] { opacity: .7; cursor: progress; }
+.chakor-theme .board-move-notice { color: var(--theme-text); background: var(--theme-heading); border-color: var(--theme-accent); }
+.chakor-theme .task-detail-heading { padding-block: 20px; }
+.chakor-theme .task-detail-panel .task-message { box-shadow: 0 4px 12px #00081415; }
+.chakor-theme .task-detail-panel .task-message time { display: block; max-width: 180px; text-align: right; }
+.chakor-theme .task-detail-panel .task-detail-fields > div { transition: border-color .18s ease; }
+.chakor-theme .task-detail-panel .task-detail-fields > div:focus-within { border-color: var(--theme-accent); }
+@media (prefers-reduced-motion: reduce) { .chakor-theme .theme-task, .chakor-theme .theme-column { transition: none; } }

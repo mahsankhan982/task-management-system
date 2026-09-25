@@ -17,6 +17,7 @@ test("workspace task visibility and unchanged editing permissions for all roles"
   }));
   let task = { id: 99, title: "Permission test", board_id: 1, stage_id: 1, description: "", priority: "Medium", due_date: "2026-10-01", created_by: 5 };
   let writes = 0;
+  let assignedToMember = false;
   const query = async (sql: string, values: unknown[] = []) => {
     if (sql.includes("password_hash") && sql.includes("FROM users")) return { rows: fixtures.filter(user => user.email === values[0]) };
     if (sql.includes("FROM users WHERE id")) return { rows: fixtures.filter(user => user.id === Number(values[0])) };
@@ -31,6 +32,8 @@ test("workspace task visibility and unchanged editing permissions for all roles"
       return { rows: [{ ...task, id: Number(values[0]), created_by: 1 }] };
     }
     if (sql.includes("FROM tasks t") && sql.includes("FOR UPDATE")) return { rows: [{ ...task }] };
+    if (sql.includes("SELECT 1 FROM task_assignees")) return { rows: assignedToMember ? [{ exists: 1 }] : [] };
+    if (sql.includes("FROM workflow_stages WHERE board_id=$1 AND id=$2")) return { rows: Number(values[1]) === 4 ? [{ id: 4, name: "For Posting" }] : [] };
     if (sql.includes("SELECT name FROM workflow_stages")) return { rows: [{ name: "To Do" }] };
     if (sql.includes("SELECT id, name") && sql.includes("FROM workflow_stages")) return { rows: [{ id: 4, name: "For Posting" }] };
     if (sql.includes("SELECT id FROM boards")) return { rows: [{ id: 1 }] };
@@ -67,7 +70,7 @@ test("workspace task visibility and unchanged editing permissions for all roles"
       assert.equal((await request("/api/workflow/8", "DELETE")).status, member ? 403 : 200, user.role + " delete list");
       assert.equal((await patch({ stage_id: 4 })).status, member ? 403 : 200, user.role + " stage move");
       assert.equal((await patch({ board_id: 2 })).status, member ? 403 : 200, user.role + " board move");
-      assert.equal((await request("/api/tasks/99/status", "PATCH", { stage_name: "For Posting" })).status, member ? 403 : 200, user.role + " status endpoint");
+      assert.equal((await request("/api/tasks/99/status", "PATCH", { stage_name: "For Posting" })).status, 200, user.role + " status endpoint");
       const listed = await request("/api/tasks", "GET");
       assert.equal(listed.status, 200);
       const data = await listed.json() as { data: { created_by: number }[] };
@@ -88,6 +91,16 @@ test("workspace task visibility and unchanged editing permissions for all roles"
         assert.equal((await patch({ title: "Owned task rename" })).status, 200, "Other owned-task edits remain allowed");
       }
     }
+    const memberLogin = await fetch(base + "/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: fixtures[4].email, password }) });
+    const memberSession = await memberLogin.json() as { token: string };
+    const move = (body: unknown) => fetch(base + "/api/tasks/99/status", { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: "Bearer " + memberSession.token }, body: JSON.stringify(body) });
+    task.created_by = 1;
+    assert.equal((await move({ stage_id: 4 })).status, 403, "Unassigned non-creator cannot move");
+    assignedToMember = true;
+    assert.equal((await move({ stage_id: 4 })).status, 200, "Assigned member can move to For Posting");
+    assert.equal((await move({ stage_id: 12345 })).status, 400, "Foreign-board or missing stage rejected");
+    assert.equal((await move({ stage_id: 4, due_date: "2027-01-01" })).status, 400, "Movement does not grant due-date edits");
+    assert.equal((await move({ stage_id: -1 })).status, 400);
     assert.equal(canEditTaskDueDate("unknown"), false);
     assert.equal((await fetch(base + "/api/tasks/99", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ due_date: null }) })).status, 401);
   } finally {

@@ -238,20 +238,14 @@ router.patch("/:id/status", async (req, res) => {
   const client = await db.connect();
 
   try {
-    if (!canEditTaskDueDate(req.user!.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "You cannot change workflow status",
-      });
+    const { stage_name, stage_id } = req.body ?? {};
+    if (Object.keys(req.body ?? {}).some(key => !["stage_name", "stage_id"].includes(key))) {
+      return res.status(400).json({ success: false, message: "Only the task stage can be changed here." });
     }
-
-    const { stage_name } = req.body;
-
-    if (typeof stage_name !== "string" || !stage_name.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "A valid stage name is required",
-      });
+    const targetId = stage_id === undefined ? null : Number(stage_id);
+    if ((targetId !== null && (!Number.isSafeInteger(targetId) || targetId <= 0)) ||
+        (targetId === null && (typeof stage_name !== "string" || !stage_name.trim()))) {
+      return res.status(400).json({ success: false, message: "A valid stage is required" });
     }
 
     await client.query("BEGIN");
@@ -269,10 +263,18 @@ router.patch("/:id/status", async (req, res) => {
 
     if (!task) {
       await client.query("ROLLBACK");
-      return res.status(403).json({
+      return res.status(404).json({
         success: false,
-        message: "You can only update tasks assigned to you",
+        message: "Task not found",
       });
+    }
+
+    if (!canEditTaskDueDate(req.user!.role) && Number(task.created_by) !== req.user!.id) {
+      const assigned = await client.query("SELECT 1 FROM task_assignees WHERE task_id=$1 AND user_id=$2", [task.id, req.user!.id]);
+      if (!assigned.rows.length) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({ success: false, message: "Only the creator or an assigned user can move this task." });
+      }
     }
 
     const currentStageResult = await client.query(
@@ -283,10 +285,13 @@ router.patch("/:id/status", async (req, res) => {
 
     const stageLookupNames = stage_name === "Waiting for Review" ? reviewStageNames : [stage_name];
 
-    const stageResult = await client.query(
+    const stageResult = targetId !== null ? await client.query(
+      "SELECT id, name FROM workflow_stages WHERE board_id=$1 AND id=$2 AND is_archived=FALSE LIMIT 1",
+      [task.board_id, targetId],
+    ) : await client.query(
       `SELECT id, name
        FROM workflow_stages
-       WHERE board_id = $1 AND name = ANY($2::text[])
+       WHERE board_id = $1 AND name = ANY($2::text[]) AND is_archived=FALSE
        ORDER BY CASE WHEN name = $3 THEN 0 ELSE 1 END
        LIMIT 1`,
       [task.board_id, stageLookupNames, stage_name],
@@ -298,7 +303,7 @@ router.patch("/:id/status", async (req, res) => {
       await client.query("ROLLBACK");
       return res.status(400).json({
         success: false,
-        message: `The ${stage_name} stage is not available on this board`,
+        message: "The selected stage is not available on this board",
       });
     }
 
@@ -317,13 +322,13 @@ router.patch("/:id/status", async (req, res) => {
         task.id,
         req.user!.id,
         "task_status_updated_by_assignee",
-        JSON.stringify({ stage_name, previous_stage_name: currentStageName }),
+        JSON.stringify({ stage_name: stage.name, previous_stage_name: currentStageName }),
       ],
     );
 
     // Whoever raised the task hears about the move. Entering and leaving review
     // get their own wording because those are the ones that need an answer.
-    if (stage_name === "Waiting for Review") {
+    if (reviewStageNames.includes(stage.name)) {
       await notifyTaskCreator(
         {
           task,
@@ -343,7 +348,7 @@ router.patch("/:id/status", async (req, res) => {
           actorId: req.user!.id,
           type: "task_review_withdrawn",
           title: "Task moved back from review",
-          message: `{actor} moved "${task.title}" back to ${stage_name}, so it is no longer waiting for your review.`,
+          message: `{actor} moved "${task.title}" back to ${stage.name}, so it is no longer waiting for your review.`,
         },
         client,
       );
@@ -354,7 +359,7 @@ router.patch("/:id/status", async (req, res) => {
           actorId: req.user!.id,
           type: "task_stage_changed",
           title: "Task moved to a new stage",
-          message: `{actor} moved "${task.title}" from ${currentStageName || "another stage"} to ${stage_name}.`,
+          message: `{actor} moved "${task.title}" from ${currentStageName || "another stage"} to ${stage.name}.`,
         },
         client,
       );

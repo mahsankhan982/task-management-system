@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { apiBlobRequest, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
-import { canEditAttachment, canEditTaskDueDate, getTaskPermissions, isTaskCreator } from "@/lib/permissions";
+import { canMoveTask, canEditAttachment, canEditTaskDueDate, getTaskPermissions, isTaskCreator } from "@/lib/permissions";
 import ChakorLogo from "@/components/brand/chakor-logo";
 
 function AuthImage({ attachmentId, alt, className }: { attachmentId: Id, alt: string, className?: string }) {
@@ -151,9 +151,9 @@ type Props = {
 };
 
 const priorities: Priority[] = ["Critical", "High", "Medium", "Low"];
-const modalCoreStageNames = ["To Do", "In Progress", "Waiting for Review", "Review", "Completed"] as const;
+const modalCoreStageNames = ["To Do", "In Progress", "Waiting for Review", "For Posting", "Completed"] as const;
 
-type AssigneeStage = "To Do" | "In Progress" | "Waiting for Review";
+type AssigneeStage = typeof modalCoreStageNames[number];
 
 // Older boards still label the review column "Review" or "Waiting for Lead".
 function normalizeStageName(name: string | null | undefined) {
@@ -325,13 +325,13 @@ export default function RealTaskModal({
         apiRequest<{ success: boolean; data: UserOption[] }>("/users"),
       ]);
 
-      setWorkflow(
-        (workflowResponse.data ?? [])
-          .filter((stage) =>
-            modalCoreStageNames.includes(stage.name as (typeof modalCoreStageNames)[number]),
-          )
-          .sort((a, b) => Number(a.position) - Number(b.position)),
-      );
+      const available = workflowResponse.data ?? [];
+      // One option per canonical stage, retaining the database ID of legacy review.
+      setWorkflow(modalCoreStageNames.flatMap(name => {
+        const stage = available.find(item => item.name === name) ??
+          available.find(item => normalizeStageName(item.name) === name);
+        return stage ? [{ ...stage, name }] : [];
+      }));
       setUsers((usersResponse.data ?? []).filter((user) => user.is_active !== false));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load task options");
@@ -410,7 +410,7 @@ export default function RealTaskModal({
   const currentStageName = normalizeStageName(task?.stage_name);
 
   // Workflow shortcuts are restricted to roles allowed to move tasks.
-  const isStatusFlowUser = canEditTaskDueDate(role);
+  const isStatusFlowUser = Boolean(task && canMoveTask(role, user.id, task));
 
   const backwardStages = useMemo<AssigneeStage[]>(() => {
     if (!isStatusFlowUser) return [];
@@ -420,8 +420,8 @@ export default function RealTaskModal({
   // A Team Member only edits tasks they created; every other role keeps the
   // permissions of its role. Falls back to no-edit while the task loads.
   const permissions = useMemo(
-    () => getTaskPermissions(role, user.id, task?.created_by),
-    [role, user.id, task?.created_by],
+    () => ({ ...getTaskPermissions(role, user.id, task?.created_by), moveTask: Boolean(task && canMoveTask(role, user.id, task)) }),
+    [role, user.id, task],
   );
 
   const mentionQuery = useMemo(() => {
@@ -498,7 +498,8 @@ export default function RealTaskModal({
       setSaved(false);
       setError("");
 
-      if (permissions.editTask) {
+      const detailsChanged = title.trim() !== task.title || (description.trim() || null) !== (task.description || null) || priority !== task.priority || (canEditDueDate && dueDate !== dateInputValue(task.due_date));
+      if (permissions.editTask && detailsChanged) {
         await apiRequest(`/tasks/${taskId}`, {
           method: "PATCH",
           body: JSON.stringify({
@@ -506,13 +507,17 @@ export default function RealTaskModal({
             description: description.trim() || null,
             priority,
             ...(canEditDueDate ? { due_date: dueDate || null } : {}),
-            // Only roles that may move tasks send a stage.
-            ...(permissions.moveTask ? { stage_id: stageId || task.stage_id } : {}),
+
           }),
         });
       }
 
-      if (permissions.assignTask) {
+      if (permissions.moveTask && Number(stageId) !== Number(task.stage_id)) {
+        await apiRequest(`/tasks/${taskId}/status`, { method: "PATCH", body: JSON.stringify({ stage_id: Number(stageId) }) });
+      }
+
+      const assignedIds = task.assignees.map(person => String(person.id)).sort().join(",");
+      if (permissions.assignTask && [...assigneeIds].sort().join(",") !== assignedIds) {
         await apiRequest(`/tasks/${taskId}/assignees`, {
           method: "PUT",
           body: JSON.stringify({
@@ -560,38 +565,8 @@ export default function RealTaskModal({
     }
   }
 
-  // Completing a task belongs to the Team Lead, Manager and Coordinator roles,
-  // so it sets the stage directly instead of using the assignee status flow.
   async function completeTask() {
-    const completedStage = workflow.find((stage) => stage.name === "Completed");
-
-    if (!task || !permissions.moveTask) return;
-
-    if (!completedStage) {
-      setError("This board has no Completed stage");
-      return;
-    }
-
-    try {
-      setStatusUpdating(true);
-      setError("");
-
-      await apiRequest(`/tasks/${taskId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          stage_id: completedStage.id,
-        }),
-      });
-
-      await loadTask();
-      await onChanged?.();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to complete task",
-      );
-    } finally {
-      setStatusUpdating(false);
-    }
+    await updateMyTaskStatus("Completed");
   }
 
   async function deleteTask() {
@@ -1378,6 +1353,7 @@ export default function RealTaskModal({
                 <label className="rounded-2xl border border-sky-100 bg-sky-50/70 p-3 text-[11px] font-bold uppercase tracking-wider text-sky-700 shadow-sm">
                   Stage
                   <select
+                    aria-label="Stage"
                     value={stageId}
                     onChange={(event) => setStageId(event.target.value)}
                     disabled={!editing || !permissions.moveTask}
@@ -2441,7 +2417,6 @@ export default function RealTaskModal({
     </div>
   );
 }
-
 
 
 

@@ -89,9 +89,9 @@ function isTeamMemberTaskWrite(method: string, rawPath: string) {
     return true;
   }
 
-  // Workflow changes are never permitted for Team Members.
+  // The status route enforces creator/assignee access for each task.
   if (method === "PATCH" && /^\/api\/tasks\/\d+\/status$/.test(path)) {
-    return false;
+    return true;
   }
 
   // Edit / delete an owned task, and its assignees and labels.
