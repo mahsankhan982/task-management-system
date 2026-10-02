@@ -208,7 +208,7 @@ router.delete("/:id", async (req, res) => {
       return res.status(403).json({ success: false, message: "Only a Team Lead, Coordinator or Manager can delete custom lists" });
     }
 
-    const taskCount = await db.query("SELECT COUNT(*)::int AS count FROM tasks WHERE stage_id=$1", [id]);
+    const taskCount = await db.query("SELECT COUNT(*)::int AS count FROM tasks WHERE stage_id=$1 OR creative_list_id=$1", [id]);
     if (taskCount.rows[0].count > 0) {
       return res.status(409).json({
         success: false,

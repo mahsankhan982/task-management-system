@@ -1,8 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import selectorStyles from "./workspace-selector.module.css";
+import { creativeNavigationOptions } from "@/lib/creative-navigation";
 import {
   ArrowRight,
+  ChevronDown,
   Code2,
   Megaphone,
   Palette,
@@ -15,6 +18,8 @@ import {
 } from "lucide-react";
 import {
   useEffect,
+  useId,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -36,6 +41,7 @@ type Board = {
   team_id?: number | null;
   created_by?: number | null;
   is_system?: boolean;
+  parent_board_id?: number | string | null;
 };
 
 type Role = "Coordinator" | "Team Lead" | "Team Member";
@@ -74,6 +80,20 @@ export default function DashboardPage() {
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
+  const [creativeStages, setCreativeStages] = useState<Array<{id:number;board_id:number;name:string;is_system?:boolean;is_archived?:boolean}>>([]);
+  const [creativeLoading, setCreativeLoading] = useState(true);
+  const [creativeError, setCreativeError] = useState(false);
+  const [creativeOpen, setCreativeOpen] = useState(false);
+  const selectorId = useId();
+  const selectorRef = useRef<HTMLElement>(null);
+  const creativeRoot = boards.find(board => !board.parent_board_id && ['creative', 'creative board'].includes(board.name.trim().toLowerCase()));
+  const creativeOptions = creativeNavigationOptions(boards, creativeStages);
+  useEffect(() => {
+    if (!creativeOpen) return;
+    const closeOutside = (event: PointerEvent) => { if (!selectorRef.current?.contains(event.target as Node)) setCreativeOpen(false); };
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, [creativeOpen]);
   const [showJoin, setShowJoin] = useState(false);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState("");
@@ -86,7 +106,13 @@ export default function DashboardPage() {
           success: boolean;
           data: Board[];
         };
-        setBoards(response.data ?? []);
+        const currentBoards = response.data ?? [];
+        setBoards(currentBoards);
+        if(currentBoards.some(board => !board.parent_board_id && ['creative','creative board'].includes(board.name.trim().toLowerCase()))){
+          try { const result = await api.workflow() as {data: typeof creativeStages}; setCreativeStages(result.data ?? []); }
+          catch { setCreativeError(true); }
+        }
+        setCreativeLoading(false);
       } catch {
         setBoards([]);
       }
@@ -282,7 +308,10 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+      <section ref={selectorRef} aria-label="Workspace selection" className="grid gap-5 md:grid-cols-2 xl:grid-cols-4"
+        onMouseLeave={() => { if (window.matchMedia('(min-width: 768px) and (hover: hover)').matches) setCreativeOpen(false); }}
+        onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setCreativeOpen(false); }}
+        onKeyDown={event => { if (event.key === 'Escape') setCreativeOpen(false); }}>
         {workspaces.map((workspace) => {
           const Icon = workspace.icon;
 
@@ -325,11 +354,11 @@ export default function DashboardPage() {
             );
           }
 
-          return (
+          const workspaceCard = (
             <Link
               key={workspace.title}
               href={`/dashboard/boards?boardId=${board.id}`}
-              className="theme-glass group relative min-h-[170px] rounded-2xl border border-amber-200/25 bg-[#0f1638]/70 p-6 shadow-lg backdrop-blur-sm transition hover:-translate-y-1 hover:border-amber-200/60 hover:shadow-xl"
+              className="theme-glass group relative block min-h-[170px] rounded-2xl border border-amber-200/25 bg-[#0f1638]/70 p-6 shadow-lg backdrop-blur-sm transition hover:-translate-y-1 hover:border-amber-200/60 hover:shadow-xl"
             >
               <span className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-amber-200/40 text-amber-200 transition group-hover:bg-amber-200 group-hover:text-[#161f45]">
                 <ArrowRight size={16} />
@@ -337,9 +366,45 @@ export default function DashboardPage() {
               {cardContent}
             </Link>
           );
+          return workspace.title === 'Creative' ? (
+            <div key={workspace.title} data-creative-dashboard-card className={selectorStyles.creativeCard + (creativeOpen ? ' ' + selectorStyles.active : '')}
+              onMouseEnter={() => { if (window.matchMedia('(min-width: 768px) and (hover: hover)').matches) setCreativeOpen(true); }}
+              onFocus={event => { if ((event.target as HTMLElement).tagName === 'A') setCreativeOpen(true); }}>
+              {workspaceCard}
+              <button type="button" aria-label="Open Creative workspaces" aria-expanded={creativeOpen} aria-controls={selectorId}
+                onClick={() => {
+                  setCreativeOpen(true);
+                  if (window.matchMedia('(max-width: 767px)').matches) window.setTimeout(() => {
+                    document.getElementById(selectorId)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+                  }, 200);
+                }} className={selectorStyles.expandButton}>
+                <ChevronDown size={16} className={creativeOpen ? selectorStyles.rotate : ''}/>
+              </button>
+            </div>
+          ) : <div key={workspace.title} onMouseEnter={() => { if (window.matchMedia('(min-width: 768px) and (hover: hover)').matches) setCreativeOpen(false); }}>{workspaceCard}</div>;
         })}
 
+        <div className={selectorStyles.panelSlot + (creativeOpen ? ' ' + selectorStyles.open : '')} inert={!creativeOpen} aria-hidden={!creativeOpen}>
+          <div className={selectorStyles.panelClip}>
+            <nav id={selectorId} aria-label="Creative Workspaces" className={selectorStyles.panel}
+              onMouseEnter={() => { if (window.matchMedia('(min-width: 768px) and (hover: hover)').matches) setCreativeOpen(true); }}>
+              <span aria-hidden="true" className={selectorStyles.connector}/>
+              <div className={selectorStyles.panelHeading}><Palette size={15}/><h2>Creative Workspaces</h2><span>{creativeOptions.length}</span></div>
+              {creativeLoading ? <p role="status" className="text-xs text-[var(--theme-muted)]">Loading Creative workspaces...</p> : creativeError ? <p role="status" className="text-xs text-[var(--theme-muted)]">Creative workspaces could not be loaded. Refresh to retry.</p> : creativeOptions.length ?
+                <div className={selectorStyles.strip} tabIndex={0} aria-label="Scroll Creative workspaces">
+                  {creativeOptions.map(option => <Link key={option.key} href={option.href} aria-label={'Open ' + option.name} data-creative-workspace={option.key}
+                    onClick={() => setCreativeOpen(false)} className={selectorStyles.subCard}>
+                    <span className={selectorStyles.initials}>{option.name.slice(0,2).toUpperCase()}</span>
+                    <span className={selectorStyles.subContent}><span className={selectorStyles.subName}>{option.name}</span><span className={selectorStyles.subDescription}>Creative workspace</span></span>
+                    <ArrowRight size={16} className={selectorStyles.subArrow}/>
+                  </Link>)}
+                </div> : <p className="text-xs text-[var(--theme-muted)]">No Creative workspaces yet.</p>}
+            </nav>
+          </div>
+        </div>
+
         {boards
+          .filter(board => !creativeRoot || Number(board.parent_board_id) !== Number(creativeRoot.id))
           .filter((board) => !workspaces.some((workspace) => {
             const searchable = `${board.name} ${board.team_name ?? ""}`.toLowerCase();
             return workspace.aliases.some((alias) => searchable.includes(alias));

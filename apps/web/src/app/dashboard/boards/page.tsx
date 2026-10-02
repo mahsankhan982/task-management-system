@@ -16,7 +16,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useRef, type DragEvent, type FormEvent } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
 import { canMoveTask, canEditTaskDueDate, isTaskCreator } from "@/lib/permissions";
@@ -31,6 +31,7 @@ type Board = {
   description: string | null;
   team_id: number | null;
   team_name: string | null;
+  parent_board_id?: number | string | null;
   created_by?: number | null;
   is_system?: boolean;
 };
@@ -53,6 +54,7 @@ type Task = {
   id: number;
   board_id: number;
   stage_id: number;
+  creative_list_id?: number | string | null;
   title: string;
   description: string | null;
   priority: Priority;
@@ -71,6 +73,7 @@ const stageIcons = {
   "Waiting for Review": MessageSquare,
   Review: MessageSquare,
   Completed: CheckCircle2,
+  Complete: CheckCircle2,
 } as const;
 
 const priorityClass: Record<Priority, string> = {
@@ -119,8 +122,10 @@ export default function BoardsPage() {
     return "normal";
   };
 
+  const router=useRouter();
   const searchParams = useSearchParams();
   const requestedBoardId = Number(searchParams.get("boardId"));
+  const requestedListId=Number(searchParams.get("creativeListId"));
   const requestedTaskId = Number(searchParams.get("task"));
 
   const { permissions, role, user } = useRole();
@@ -243,6 +248,9 @@ export default function BoardsPage() {
         return nextBoards[0]?.id ?? null;
       });
 
+      if(requestedTask?.creative_list_id&&Number(requestedTask.creative_list_id)!==requestedListId){
+        router.replace('/dashboard/boards?boardId='+requestedTask.board_id+'&creativeListId='+requestedTask.creative_list_id+'&task='+requestedTask.id,{scroll:false});
+      }
       if (requestedTask) {
         setSelectedTaskInitialEdit(false);
         setSelectedTaskId(Number(requestedTask.id));
@@ -256,9 +264,36 @@ export default function BoardsPage() {
 
   useEffect(() => {
     void Promise.resolve().then(() => loadData());
-  }, [requestedBoardId, requestedTaskId]);
+  }, [requestedBoardId, requestedTaskId, requestedListId]);
 
   const selectedBoard = boards.find((board) => board.id === selectedBoardId);
+  const creativeRoot=boards.find(board=>!board.parent_board_id&&['creative','creative board'].includes(board.name.trim().toLowerCase()));
+  const isCreative=Boolean(creativeRoot&&(selectedBoardId===creativeRoot.id||Number(selectedBoard?.parent_board_id)===creativeRoot.id));
+  const coreNames=new Set(['To Do','In Progress','Waiting for Review','Review','Waiting for Lead','For Posting','Completed']);
+  const creativeBoards=creativeRoot?boards.filter(board=>Number(board.parent_board_id)===creativeRoot.id):[];
+  const creativeLists=creativeRoot?workflow.filter(stage=>!stage.is_system&&!coreNames.has(stage.name)&&(Number(stage.board_id)===creativeRoot.id||creativeBoards.some(board=>board.id===Number(stage.board_id)))):[];
+  const creativeOptions=creativeRoot?[
+    ...creativeBoards.map(board=>({key:'board:'+board.id,name:board.name,boardId:board.id,listId:0})),
+    ...creativeLists.map(stage=>({key:'list:'+stage.id,name:Number(stage.board_id)===creativeRoot.id?stage.name:(boards.find(board=>board.id===Number(stage.board_id))?.name+' / '+stage.name),boardId:Number(stage.board_id),listId:stage.id})),
+    {key:'board:'+creativeRoot.id,name:'Creative Main Board',boardId:creativeRoot.id,listId:0},
+  ]:[];
+  const activeCreativeOption=creativeOptions.find(option=>option.boardId===selectedBoardId&&option.listId===requestedListId);
+  const isCreativeSubBoard=isCreative&&(selectedBoardId!==creativeRoot?.id||requestedListId>0);
+  const selectedCreativeList=creativeLists.find(stage=>stage.id===requestedListId);
+
+  function openCreativeOption(option?: typeof creativeOptions[number]) {
+    if(!creativeRoot)return;
+    setShowCreate(false);setCreateStageId(null);setDraggedTaskId(null);setDropStageId(null);setSelectedTaskId(null);
+    setSelectedBoardId(option?.boardId??creativeRoot.id);
+    router.push('/dashboard/boards?boardId='+(option?.boardId??creativeRoot.id)+(option?.listId?'&creativeListId='+option.listId:option?.boardId===creativeRoot.id?'&view=workflow':''),{scroll:false});
+  }
+  function selectBoard(boardId:number){
+    const target=boards.find(board=>board.id===boardId);
+    if(isCreative||target?.id===creativeRoot?.id||Number(target?.parent_board_id)===creativeRoot?.id){
+      setShowCreate(false);setCreateStageId(null);setDraggedTaskId(null);setSelectedBoardId(boardId);
+      router.push('/dashboard/boards?boardId='+boardId,{scroll:false});
+    }else setSelectedBoardId(boardId);
+  }
 
   const boardWorkflow = useMemo(
     () =>
@@ -329,7 +364,7 @@ export default function BoardsPage() {
             is_system: true,
           }
         : null,
-      ...customLists,
+      ...(isCreative?[]:customLists),
       inProgress
         ? {
             id: Number(inProgress.id),
@@ -350,23 +385,23 @@ export default function BoardsPage() {
             is_system: true,
           }
         : null,
-      {
+      ...(!isCreative || tasks.some(task => Number(task.board_id) === selectedBoardId && Number(task.creative_list_id ?? 0) === requestedListId && Number(task.stage_id) === Number(forPosting?.id)) ? [{
         id: forPosting ? Number(forPosting.id) : -1,
         name: "For Posting",
         stageIds: forPosting ? [Number(forPosting.id)] : [],
         created_by: forPosting?.created_by,
         is_system: true,
-      },
+      }] : []),
       Completed
         ? {
             id: Number(Completed.id),
-            name: "Completed",
+            name: isCreative?"Complete":"Completed",
             stageIds: [Number(Completed.id)],
             created_by: Completed.created_by,
             is_system: true,
           }
         : null,
-      ...otherSystemLists,
+      ...(isCreative?[]:otherSystemLists),
     ].filter(Boolean) as Array<{
       id: number;
       name: string;
@@ -374,15 +409,15 @@ export default function BoardsPage() {
       created_by?: number | null;
       is_system?: boolean;
     }>;
-  }, [boardWorkflow]);
+  }, [boardWorkflow, isCreative, tasks, selectedBoardId, requestedListId]);
 
   // Team Members create tasks in To Do and cannot select another stage.
   const creatableWorkflow = useMemo(
     () =>
-      role === "Team Member"
+      (role === "Team Member" || isCreative)
         ? displayWorkflow.filter((stage) => stage.id > 0 && stage.name === "To Do")
         : displayWorkflow.filter((stage) => stage.id > 0),
-    [displayWorkflow, role],
+    [displayWorkflow, role, isCreative],
   );
 
 
@@ -400,6 +435,7 @@ export default function BoardsPage() {
     const clean = query.trim().toLowerCase();
     return tasks.filter((task) => {
       if (task.board_id !== selectedBoardId) return false;
+      if(isCreative&&Number(task.creative_list_id??0)!==requestedListId)return false;
       if (assigneeFilter && !task.assignees?.some((a) => String(a.id) === assigneeFilter)) return false;
       if (dueDateFilter && String(task.due_date ?? "").slice(0, 10) !== dueDateFilter) return false;
       if (!clean) return true;
@@ -409,7 +445,7 @@ export default function BoardsPage() {
         task.stage_name.toLowerCase().includes(clean)
       );
     });
-  }, [tasks, selectedBoardId, query, assigneeFilter, dueDateFilter]);
+  }, [tasks, selectedBoardId, query, assigneeFilter, dueDateFilter, isCreative, requestedListId]);
 
   async function moveTask(taskId: number, stageId: number) {
     if (stageId < 0) {
@@ -452,7 +488,7 @@ export default function BoardsPage() {
     const form = new FormData(formElement);
     const title = String(form.get("title") || "").trim();
     const priority = String(form.get("priority") || "Medium") as Priority;
-    const stageId = Number(form.get("stage_id"));
+    const stageId = isCreative ? Number(creatableWorkflow[0]?.id) : Number(form.get("stage_id"));
     const dueDate = String(form.get("due_date") || "");
 
     if (!title || !stageId) return;
@@ -469,6 +505,7 @@ export default function BoardsPage() {
         body: JSON.stringify({
           board_id: selectedBoardId,
           stage_id: stageId,
+          ...(isCreative&&requestedListId>0?{creative_list_id:requestedListId}:{}),
           title,
           priority,
           ...(role === "Team Member" ? { assignee_ids: [user.id] } : {}),
@@ -581,17 +618,19 @@ export default function BoardsPage() {
 
     const name = window.prompt("List name:")?.trim();
     if (!name) return;
+    if(isCreative&&(coreNames.has(name)||creativeOptions.some(option=>option.name.trim().toLowerCase()===name.toLowerCase()))){setError('Choose a new Creative category name distinct from existing boards and statuses.');return;}
 
     try {
       setError("");
-      await apiRequest("/workflow", {
+      const result=await apiRequest<{data:WorkflowStage}>("/workflow", {
         method: "POST",
         body: JSON.stringify({
-          board_id: selectedBoardId,
+          board_id: isCreative?creativeRoot?.id:selectedBoardId,
           name,
         }),
       });
       await loadData();
+      if(isCreative&&creativeRoot&&result.data?.id){openCreativeOption({key:'list:'+result.data.id,name:result.data.name,boardId:creativeRoot.id,listId:Number(result.data.id)});return;}
       // Wait for the refreshed columns to render, then reveal the new list.
       window.requestAnimationFrame(() => {
         const container = scrollContainerRef.current;
@@ -628,6 +667,7 @@ export default function BoardsPage() {
   }
 
   function toggleTaskCreator(stageId: number) {
+    if (isCreative) stageId = creatableWorkflow[0]?.id ?? stageId;
     if (showCreate && createStageId === stageId) {
       setShowCreate(false);
       setCreateStageId(null);
@@ -644,7 +684,7 @@ export default function BoardsPage() {
   return (
     <div className="theme-page flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden p-3 md:p-4">
       {moveNotice && <div role="status" className="board-move-notice fixed bottom-5 right-5 z-[110] rounded-xl border px-5 py-3 text-sm shadow-xl">{moveNotice}</div>}
-      <BoardNavPanels handleTaskLinks={false} boards={boards} selectedBoardId={selectedBoardId} onSelectBoard={(id) => setSelectedBoardId(id)} />
+      <BoardNavPanels handleTaskLinks={false} boards={boards} selectedBoardId={selectedBoardId} onSelectBoard={selectBoard} />
       <div className="mx-auto flex min-h-0 w-full flex-1 flex-col max-w-none">
         <div className="theme-board-heading mb-3 flex flex-col gap-3 rounded-2xl border border-white/10 bg-gradient-to-r from-[#071827] via-[#0E304A] to-[#184967] p-4 text-white shadow-2xl shadow-black/20 backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -652,14 +692,14 @@ export default function BoardsPage() {
               Live Workspace
             </p>
             <h1 className="mt-1 text-xl font-bold text-white">
-              {selectedBoard?.name ?? "Boards"}
+              {isCreativeSubBoard ? activeCreativeOption?.name + ' Board' : selectedBoard?.name ?? "Boards"}
             </h1>
             <p className="mt-1 text-xs text-white/70">
               {selectedBoard?.team_name ?? "No team"} · PostgreSQL data
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          {canManageBoards ? <div className="flex flex-wrap gap-2">
             {canManageBoards ? (
               <button
                 type="button"
@@ -692,25 +732,7 @@ export default function BoardsPage() {
 
               </>
             ) : null}
-
-            {boards.map((board) => (
-              <button
-                key={board.id}
-                type="button"
-                onClick={() => setSelectedBoardId(board.id)}
-                aria-pressed={board.id === selectedBoardId}
-                className={`rounded-md px-3 py-2 text-xs font-semibold transition ${
-                  board.id === selectedBoardId
-                    ? "bg-[#E9D399] text-[#082034] shadow-lg"
-                    : "bg-white/15 text-white hover:bg-white/25"
-                }`}
-              >
-                {board.name}
-              </button>
-            ))}
-
-
-          </div>
+          </div> : null}
         </div>
 
 
@@ -734,6 +756,7 @@ export default function BoardsPage() {
             onSubmit={handleCreateTask}
             className="theme-task-creator mb-4 grid gap-3 rounded-2xl border bg-white p-4 shadow-sm md:grid-cols-[1fr_160px_190px_180px_auto]"
           >
+            {isCreative && <p className="text-xs md:col-span-full">New tasks start in To Do in this Creative workspace.</p>}
             {role === "Team Member" && <p className="text-xs md:col-span-full">New tasks start in To Do and are assigned to you. You can adjust assignees after creating the task.</p>}
             <input
               name="title"
@@ -833,7 +856,7 @@ export default function BoardsPage() {
             ) : "No boards found in the database."}
           </div>
         ) : (
-          <div className="theme-board-canvas min-h-0 flex-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-[#DCE6EF]/90 p-3 pb-4 shadow-inner backdrop-blur-sm" ref={scrollContainerRef}>
+          <div className={`theme-board-canvas ${isCreative ? "mb-16" : ""} min-h-0 flex-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-[#DCE6EF]/90 p-3 pb-4 shadow-inner backdrop-blur-sm`} ref={scrollContainerRef}>
             <div className="flex h-full min-w-max items-stretch gap-3">
               {displayWorkflow.map((stage) => {
                 const Icon = stageIcons[stage.name as keyof typeof stageIcons] ?? CircleDot;
@@ -856,7 +879,7 @@ export default function BoardsPage() {
                       if (taskId) moveTask(taskId, stage.id);
                       setDraggedTaskId(null); setDropStageId(null);
                     }}
-                    className="theme-column flex h-full max-h-full w-[285px] shrink-0 flex-col rounded-2xl border border-[#DCE5EC] bg-gradient-to-br from-white to-[#F8FBFD]/95 p-3 shadow-xl shadow-slate-950/10"
+                    className={`theme-column flex h-full max-h-full ${isCreative ? "min-w-[260px] flex-1" : "w-[285px] shrink-0"} flex-col rounded-2xl border border-[#DCE5EC] bg-gradient-to-br from-white to-[#F8FBFD]/95 p-3 shadow-xl shadow-slate-950/10`}
                   >
                     <div className="mb-2.5 flex items-center gap-2 px-1">
                       <Icon size={16} className="text-slate-600" />
@@ -956,7 +979,19 @@ export default function BoardsPage() {
                 );
               })}
 
-              {canManageBoards && selectedBoardId ? (
+              {canManageBoards && selectedBoardId && isCreative ? (
+                <div className="flex w-[130px] shrink-0 flex-col items-center gap-2 self-start pt-16">
+                  <button type="button" onClick={() => void createList()} className="theme-gold flex h-14 w-full items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold shadow-md">
+                    <Plus size={17}/>Add List
+                  </button>
+                  {selectedCreativeList ? <div className="flex gap-2">
+                    <button type="button" title="Edit Creative list" onClick={() => void editList(selectedCreativeList)} className="rounded-lg border p-2"><Pencil size={14}/></button>
+                    <button type="button" title="Delete Creative list" onClick={() => void deleteList(selectedCreativeList)} className="rounded-lg border p-2"><Trash2 size={14}/></button>
+                  </div> : null}
+                </div>
+              ) : null}
+
+              {canManageBoards && selectedBoardId && !isCreative ? (
                 <button
                   type="button"
                   onClick={createList}

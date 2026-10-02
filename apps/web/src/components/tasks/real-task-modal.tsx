@@ -128,6 +128,7 @@ type TaskAttachment = {
 type TaskDetails = {
   id: Id;
   board_id: Id;
+  is_creative?: boolean;
   stage_id: Id;
   created_by: Id | null;
   created_by_name: string | null;
@@ -1359,9 +1360,9 @@ export default function RealTaskModal({
                     disabled={!editing || !permissions.moveTask}
                     className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm normal-case text-slate-800 shadow-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:bg-slate-50"
                   >
-                    {workflow.map((stage) => (
+                    {workflow.filter(stage => !task?.is_creative || stage.name !== "For Posting" || task.stage_name === "For Posting").map((stage) => (
                       <option key={String(stage.id)} value={String(stage.id)}>
-                        {stage.name}
+                        {task?.is_creative && stage.name === "Completed" ? "Complete" : stage.name}
                       </option>
                     ))}
                   </select>

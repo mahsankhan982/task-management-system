@@ -1,3 +1,4 @@
+import { creativeContexts, creativeCategory, creativeTaskViews, isCreativeList, isCreativeStatus } from "../lib/creativeTasks";
 import { Router, type Request, type Response } from "express";
 import { db } from "../db/pool";
 import { getBoardName, notifyMake } from '../lib/notifyMake';
@@ -63,7 +64,7 @@ router.get("/", async (req, res) => {
        LEFT JOIN users cb ON cb.id = t.created_by
        ORDER BY t.created_at DESC`
     );
-    return res.status(200).json({ success: true, data: result.rows });
+    return res.status(200).json({ success: true, data: await creativeTaskViews(db,result.rows) });
   } catch (error) {
     console.error("Get tasks failed:", error);
     return res.status(500).json({ success: false, message: "Unable to fetch tasks" });
@@ -123,7 +124,7 @@ router.get("/:id", async (req, res) => {
     return res.status(200).json({
       success: true,
       data: {
-        ...taskResult.rows[0],
+        ...(await creativeTaskViews(db,[taskResult.rows[0]]))[0],
         assignees: assignees.rows,
         checklist: checklist.rows,
         comments: comments.rows,
@@ -140,7 +141,8 @@ router.get("/:id", async (req, res) => {
 router.post("/", async (req, res) => {
   const client = await db.connect();
   try {
-    const { board_id, stage_id, title, description, priority, due_date, assignee_ids } = req.body;
+    const { board_id, stage_id: requestedStageId, title, description, priority, due_date, assignee_ids } = req.body;
+    let stage_id=requestedStageId;
     if (due_date != null && due_date !== "" && !canEditTaskDueDate(req.user!.role)) {
       return res.status(403).json({ success: false, message: "Team Members cannot set due dates." });
     }
@@ -156,6 +158,19 @@ router.post("/", async (req, res) => {
 
     await client.query("BEGIN");
 
+    const creativeContext=(await creativeContexts(client,[board_id])).get(Number(board_id));
+    let categoryId: number | null = req.body.creative_list_id == null ? null : Number(req.body.creative_list_id);
+    if(creativeContext){
+      const requested=creativeContext.stages.find(stage=>Number(stage.id)===Number(stage_id)&&!stage.is_archived);
+      if(!requested){await client.query('ROLLBACK');return res.status(400).json({success:false,message:'Invalid Creative stage'});}
+      if(isCreativeList(requested)){
+        if(categoryId!==null&&categoryId!==Number(requested.id)){await client.query('ROLLBACK');return res.status(400).json({success:false,message:'Conflicting Creative category'});}
+        categoryId=Number(requested.id);stage_id=creativeContext.stages.find(stage=>stage.name==='To Do'&&!stage.is_archived)?.id;
+      }else if(!isCreativeStatus(requested.name)){await client.query('ROLLBACK');return res.status(400).json({success:false,message:'Invalid Creative status'});}
+    }
+    if(categoryId!==null&&(!creativeContext||!Number.isSafeInteger(categoryId)||!creativeContext.stages.some(stage=>Number(stage.id)===categoryId&&isCreativeList(stage)&&!stage.is_archived))){
+      await client.query('ROLLBACK');return res.status(400).json({success:false,message:'Invalid Creative category'});
+    }
     // Team Members create tasks in the initial stage only.
     if (req.user!.role === "Team Member") {
       const targetStage = await client.query(
@@ -172,7 +187,10 @@ router.post("/", async (req, res) => {
       }
     }
 
-    const result = await client.query(
+    const result = categoryId!==null ? await client.query(
+      "INSERT INTO tasks (board_id,stage_id,title,description,priority,due_date,created_by,creative_list_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
+      [board_id,stage_id,title.trim(),description??null,taskPriority,due_date??null,req.user!.id,categoryId]
+    ) : await client.query(
       "INSERT INTO tasks (board_id, stage_id, title, description, priority, due_date, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
       [board_id, stage_id, title.trim(), description ?? null, taskPriority, due_date ?? null, req.user!.id]
     );
@@ -251,7 +269,7 @@ router.patch("/:id/status", async (req, res) => {
     await client.query("BEGIN");
 
     const taskResult = await client.query(
-      `SELECT t.id, t.board_id, t.stage_id, t.title, t.updated_at, t.created_by
+      `SELECT t.id, t.board_id, t.stage_id, t.title, t.updated_at, t.created_by, t.creative_list_id
        FROM tasks t
        WHERE t.id = $1
        LIMIT 1
@@ -277,11 +295,13 @@ router.patch("/:id/status", async (req, res) => {
       }
     }
 
+    const creativeContext=(await creativeContexts(client,[task.board_id])).get(Number(task.board_id));
+    const category=creativeContext?creativeCategory(task,creativeContext.stages):undefined;
     const currentStageResult = await client.query(
       "SELECT name FROM workflow_stages WHERE id = $1 LIMIT 1",
       [task.stage_id],
     );
-    const currentStageName = currentStageResult.rows[0]?.name ?? "";
+    const currentStageName = creativeContext?.stages.some(stage=>Number(stage.id)===Number(task.stage_id)&&isCreativeList(stage)) ? "To Do" : currentStageResult.rows[0]?.name ?? "";
 
     const stageLookupNames = stage_name === "Waiting for Review" ? reviewStageNames : [stage_name];
 
@@ -307,7 +327,13 @@ router.patch("/:id/status", async (req, res) => {
       });
     }
 
-    const updated = await client.query(
+    if(creativeContext&&!isCreativeStatus(stage.name)){
+      await client.query('ROLLBACK');return res.status(400).json({success:false,message:'Creative status changes must preserve the category'});
+    }
+    const updated = creativeContext ? await client.query(
+      "UPDATE tasks SET stage_id=$1,creative_list_id=$3,updated_at=NOW() WHERE id=$2 RETURNING *",
+      [stage.id,task.id,category?.id??null]
+    ) : await client.query(
       `UPDATE tasks
        SET stage_id = $1, updated_at = NOW()
        WHERE id = $2
@@ -626,7 +652,7 @@ router.patch("/:id", async (req, res) => {
 
     await client.query("BEGIN");
    const previousTaskResult = await client.query(
-  'SELECT id, title, board_id, stage_id, description, priority, due_date, created_by FROM tasks WHERE id = $1 FOR UPDATE',
+  'SELECT id, title, board_id, stage_id, description, priority, due_date, created_by, creative_list_id FROM tasks WHERE id = $1 FOR UPDATE',
   [req.params.id],
 );
     const previousTask = previousTaskResult.rows[0];
@@ -656,7 +682,16 @@ router.patch("/:id", async (req, res) => {
       return res.status(403).json({ success: false, message: "You cannot change workflow status or move tasks between boards." });
     }
 
-    const result = await client.query(
+    const creativeContext=(await creativeContexts(client,[previousTask.board_id])).get(Number(previousTask.board_id));
+    const sameBoard=board_id===undefined||Number(board_id)===Number(previousTask.board_id);
+    if(creativeContext&&sameBoard&&stage_id!==undefined&&!creativeContext.stages.some(stage=>Number(stage.id)===Number(stage_id)&&!stage.is_archived&&isCreativeStatus(stage.name))){
+      await client.query('ROLLBACK');return res.status(400).json({success:false,message:'Invalid Creative status'});
+    }
+    const category=creativeContext&&sameBoard?creativeCategory(previousTask,creativeContext.stages):undefined;
+    const result = creativeContext ? await client.query(
+      "UPDATE tasks SET title=COALESCE($1,title),description=COALESCE($2,description),priority=COALESCE($3,priority),due_date=CASE WHEN $4::boolean THEN $5::date ELSE due_date END,stage_id=COALESCE($6,stage_id),board_id=COALESCE($7,board_id),creative_list_id=$9,updated_at=NOW() WHERE id=$8 RETURNING *",
+      [title??null,description??null,priority??null,due_date!==undefined,due_date||null,stage_id??null,board_id??null,req.params.id,category?.id??null]
+    ) : await client.query(
       "UPDATE tasks SET title=COALESCE($1,title), description=COALESCE($2,description), priority=COALESCE($3,priority), due_date=CASE WHEN $4::boolean THEN $5::date ELSE due_date END, stage_id=COALESCE($6,stage_id), board_id=COALESCE($7,board_id), updated_at=NOW() WHERE id=$8 RETURNING *",
       [title ?? null, description ?? null, priority ?? null, due_date !== undefined, due_date || null, stage_id ?? null, board_id ?? null, req.params.id]
     );
