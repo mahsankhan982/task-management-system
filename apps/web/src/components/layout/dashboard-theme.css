@@ -96,8 +96,8 @@
   box-shadow: inset 0 1px 0 #aacdea0c, 0 6px 18px #000c1a40;
   backdrop-filter: blur(12px);
 }
-.chakor-theme[data-theme="dark"] .theme-task[data-due="overdue"] { border-color: #c6a562 !important; }
-.chakor-theme[data-theme="dark"] .theme-task[data-due="today"] { border-color: #5b9abe !important; }
+.chakor-theme .theme-task[data-due="overdue"] { border-top-color: #ce6673 !important; border-right-color: #ce6673 !important; border-bottom-color: #ce6673 !important; box-shadow: inset 0 0 0 1px #ce667318, 0 4px 14px #ce66731c; }
+.chakor-theme .theme-task[data-due="today"] { border-top-color: #d5ad55 !important; border-right-color: #d5ad55 !important; border-bottom-color: #d5ad55 !important; box-shadow: inset 0 0 0 1px #d5ad5518, 0 4px 14px #d5ad551c; }
 .chakor-theme[data-theme="dark"] .theme-task:hover { border-color: #74b6d28c; box-shadow: 0 10px 28px #000a1a66; }
 .chakor-theme[data-theme="dark"] .theme-task p,
 .chakor-theme[data-theme="dark"] .theme-task > div:last-child { color: #a5bbce; border-color: #7e9cb52b; }
@@ -237,3 +237,40 @@
 .chakor-theme .task-detail-panel .task-detail-fields > div { transition: border-color .18s ease; }
 .chakor-theme .task-detail-panel .task-detail-fields > div:focus-within { border-color: var(--theme-accent); }
 @media (prefers-reduced-motion: reduce) { .chakor-theme .theme-task, .chakor-theme .theme-column { transition: none; } }
+
+/* Compact proportions belong only to the individual Board page. */
+.chakor-theme .theme-compact-board .theme-task { padding: 10px; border-radius: 12px; }
+
+/* Board filters share the existing palette; the native calendar stays native. */
+.chakor-theme .employee-filter-trigger,
+.chakor-theme .employee-filter-options { background: var(--theme-heading); border-color: var(--theme-border); color: var(--theme-text); }
+.chakor-theme .employee-filter-options { background: var(--theme-bg); }
+.chakor-theme .employee-filter-options input { accent-color: var(--theme-accent); }
+.chakor-theme .employee-filter-options > div:last-child { border-color: var(--theme-border); }
+.chakor-theme .employee-filter-apply { background: var(--theme-accent); color: #142d40; }
+.chakor-theme[data-theme="dark"] .task-detail-panel :is([class*="bg-white/"], [class*="bg-cyan-50"], [class*="bg-slate-100"], [class*="bg-sky-100"]) { background: var(--detail-surface); border-color: var(--theme-border); }
+.chakor-theme[data-theme="dark"] .task-detail-panel :is(input, textarea, select, option, [contenteditable="true"]) { color-scheme: dark; background: var(--detail-input); color: var(--theme-text); border-color: var(--theme-border); }
+.chakor-theme[data-theme="dark"] .task-detail-panel select:disabled { background: var(--detail-input); color: var(--theme-muted); }
+.chakor-theme .task-detail-panel .task-chat-scroll[data-empty="true"] { height: 96px; min-height: 96px; }
+.chakor-theme .task-chat-scroll[data-empty="true"] p { background: transparent; box-shadow: none; border-radius: 0; text-align: center; }
+.chakor-theme .task-detail-panel .task-chat-scroll { height: clamp(10rem, 28vh, 280px); }
+.chakor-theme[data-theme="dark"] .task-detail-panel input[type="file"]::file-selector-button { background: var(--detail-message); color: var(--theme-text); border: 1px solid var(--theme-border); }
+
+/* Refine existing board proportions without changing its palette or navigation. */
+.chakor-theme .theme-compact-board .theme-column { flex: 0 0 clamp(220px, 17vw, 260px); max-width: 260px; }
+.chakor-theme .theme-compact-board .theme-board-heading { padding-block: 6px; }
+.chakor-theme .theme-compact-board .theme-board-heading > div:first-child > p:first-child { font-size: 10px; line-height: 12px; }
+.chakor-theme .theme-compact-board .theme-board-heading h1 { margin-top: 2px; font-size: 18px; line-height: 22px; }
+.chakor-theme .theme-compact-board .theme-board-heading > div:first-child > p:last-child { margin-top: 2px; font-size: 11px; line-height: 14px; }
+.chakor-theme .theme-compact-board .theme-task { padding: 6px 8px; }
+.chakor-theme .theme-compact-board .theme-task h3 { margin-top: 4px; line-height: 18px; }
+.chakor-theme .theme-compact-board .theme-task h3 + p { margin-top: 2px; line-height: 14px; }
+.chakor-theme .theme-compact-board .theme-task > div:last-child { margin-top: 6px; padding-top: 6px; }
+.chakor-theme .theme-compact-board .theme-board-canvas { margin-bottom: 60px; }
+.chakor-theme .board-date-trigger { background: var(--theme-heading); border-color: var(--theme-border); color: var(--theme-text); }
+.chakor-theme .board-date-options { background: var(--theme-bg); border-color: var(--theme-border); color: var(--theme-text); }
+.chakor-theme .board-date-options input { background: var(--theme-glass); border-color: var(--theme-border); color: var(--theme-text); }
+.chakor-theme .board-date-apply { background: var(--theme-accent); color: #142d40; }
+@media (max-width: 640px) { .chakor-theme .theme-compact-board .theme-board-canvas { margin-bottom: 62px; } }
+
+.chakor-theme .theme-compact-board .theme-add-list-button { background: linear-gradient(110deg, #e9d399, #c7a35d); color: #142d40; border: 1px solid #e9d39980; box-shadow: 0 4px 14px #00142420; }

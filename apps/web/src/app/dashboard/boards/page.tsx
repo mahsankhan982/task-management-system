@@ -13,7 +13,6 @@ import {
   Plus,
   Search,
   Trash2,
-  UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useRef, type DragEvent, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -21,6 +20,7 @@ import { api, apiRequest } from "@/lib/api";
 import { useRole } from "@/contexts/role-context";
 import { canMoveTask, canEditTaskDueDate, isTaskCreator } from "@/lib/permissions";
 import RealTaskModal from "@/components/tasks/real-task-modal";
+import EmployeeFilter from "@/components/boards/employee-filter";
 import BoardNavPanels from "@/components/boards/board-nav-panels";
 
 type Priority = "Critical" | "High" | "Medium" | "Low";
@@ -111,14 +111,33 @@ function isPermanentBoard(board: Board | undefined) {
   return Boolean(board?.is_system) || permanentBoardNames.has(String(board?.name ?? "").trim().toLowerCase());
 }
 
+function localCalendarDate(date: Date) {
+  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0") + "-" + String(date.getDate()).padStart(2, "0");
+}
+
 export default function BoardsPage() {
+  const [localToday, setLocalToday] = useState(() => localCalendarDate(new Date()));
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const refresh = () => {
+      clearTimeout(timer);
+      const now = new Date();
+      setLocalToday(localCalendarDate(now));
+      // Local midnight scheduling accounts for daylight-saving days as well.
+      const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      timer = setTimeout(refresh, Math.max(100, midnight.getTime() - now.getTime() + 50));
+    };
+    const visible = () => { if (document.visibilityState === "visible") refresh(); };
+    timer = setTimeout(refresh, 0);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", visible);
+    return () => { clearTimeout(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", visible); };
+  }, []);
   const getDueState = (task: Task) => {
-    if (!task.due_date || task.stage_name === "Completed") return "normal";
-    const due = String(task.due_date).slice(0, 10);
-    const now = new Date();
-    const today = now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
-    if (due < today) return "overdue";
-    if (due === today) return "today";
+    const due = String(task.due_date ?? "").match(/^\d{4}-\d{2}-\d{2}(?=$|T|\s)/)?.[0];
+    if (!due) return "normal";
+    if (due < localToday) return "overdue";
+    if (due === localToday) return "today";
     return "normal";
   };
 
@@ -137,8 +156,26 @@ export default function BoardsPage() {
   const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
-  const [assigneeFilter, setAssigneeFilter] = useState("");
-  const [dueDateFilter, setDueDateFilter] = useState("");
+  const [assigneeFilter, setAssigneeFilter] = useState<number[]>([]);
+  const [dueDateFilter, setDueDateFilter] = useState({ start: "", end: "" });
+  const [dateDraft, setDateDraft] = useState({ start: "", end: "" });
+  const [dateFilterOpen, setDateFilterOpen] = useState(false);
+  const [dateFilterError, setDateFilterError] = useState("");
+  const dateTriggerRef = useRef<HTMLButtonElement>(null);
+  const datePopupRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!dateFilterOpen) return;
+    const outside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!dateTriggerRef.current?.contains(target) && !datePopupRef.current?.contains(target)) setDateFilterOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { setDateFilterOpen(false); dateTriggerRef.current?.focus(); }
+    };
+    document.addEventListener("pointerdown", outside, true);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", outside, true); document.removeEventListener("keydown", escape); };
+  }, [dateFilterOpen]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -421,23 +458,19 @@ export default function BoardsPage() {
   );
 
 
-  const assigneeOptions = useMemo(() => {
-    const map = new Map<number, string>();
-    tasks.forEach((task) => {
-      task.assignees?.forEach((assignee) => {
-        map.set(Number(assignee.id), assignee.full_name);
-      });
-    });
-    return Array.from(map.entries()).sort((a, b) => a[1].localeCompare(b[1]));
-  }, [tasks]);
-
   const boardTasks = useMemo(() => {
     const clean = query.trim().toLowerCase();
     return tasks.filter((task) => {
       if (task.board_id !== selectedBoardId) return false;
       if(isCreative&&Number(task.creative_list_id??0)!==requestedListId)return false;
-      if (assigneeFilter && !task.assignees?.some((a) => String(a.id) === assigneeFilter)) return false;
-      if (dueDateFilter && String(task.due_date ?? "").slice(0, 10) !== dueDateFilter) return false;
+      if (assigneeFilter.length && !task.assignees?.some((a) => assigneeFilter.includes(Number(a.id)))) return false;
+      if (dueDateFilter.start || dueDateFilter.end) {
+        // API date/ISO prefixes are calendar dates: never parse a timezone here.
+        const due = String(task.due_date ?? "").match(/^\d{4}-\d{2}-\d{2}(?=$|T|\s)/)?.[0];
+        const start = dueDateFilter.start || dueDateFilter.end;
+        const end = dueDateFilter.end || dueDateFilter.start;
+        if (!due || due < start || due > end) return false;
+      }
       if (!clean) return true;
       return (
         task.title.toLowerCase().includes(clean) ||
@@ -682,11 +715,11 @@ export default function BoardsPage() {
   }
 
   return (
-    <div className="theme-page flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden p-3 md:p-4">
+    <div className="theme-page theme-compact-board flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden p-2.5 md:p-3">
       {moveNotice && <div role="status" className="board-move-notice fixed bottom-5 right-5 z-[110] rounded-xl border px-5 py-3 text-sm shadow-xl">{moveNotice}</div>}
       <BoardNavPanels handleTaskLinks={false} boards={boards} selectedBoardId={selectedBoardId} onSelectBoard={selectBoard} />
       <div className="mx-auto flex min-h-0 w-full flex-1 flex-col max-w-none">
-        <div className="theme-board-heading mb-3 flex flex-col gap-3 rounded-2xl border border-white/10 bg-gradient-to-r from-[#071827] via-[#0E304A] to-[#184967] p-4 text-white shadow-2xl shadow-black/20 backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
+        <div className="theme-board-heading mb-2 flex flex-col gap-2 rounded-2xl border border-white/10 bg-gradient-to-r from-[#071827] via-[#0E304A] to-[#184967] px-4 py-2 text-white shadow-2xl shadow-black/20 backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-[#E6C87D]">
               Live Workspace
@@ -817,36 +850,24 @@ export default function BoardsPage() {
             />
           </div>
 
-          <div className="flex items-center rounded-lg border border-violet-100 bg-violet-50/60 px-3 lg:w-[210px]">
-            <CalendarDays size={16} className="shrink-0 text-violet-600" />
-            <input
-              type="date"
-              value={dueDateFilter}
-              onChange={(event) => setDueDateFilter(event.target.value)}
-              aria-label="Filter tasks by due date"
-              title="Filter tasks by due date"
-              className="h-11 min-w-0 flex-1 bg-transparent px-2 text-sm font-medium text-slate-700 outline-none"
-            />
-            {dueDateFilter ? (
-              <button
-                type="button"
-                onClick={() => setDueDateFilter("")}
-                className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-100"
-              >
-                Clear
-              </button>
-            ) : null}
+          <div className="board-date-filter relative lg:w-[240px]">
+            <button ref={dateTriggerRef} type="button" aria-label="Filter tasks by due date" aria-expanded={dateFilterOpen} aria-controls="board-date-range" className="board-date-trigger flex h-11 w-full items-center gap-2 rounded-lg border px-3 text-left text-sm font-medium" onClick={() => { setDateDraft({ ...dueDateFilter }); setDateFilterError(""); setDateFilterOpen(open => !open); }}>
+              <CalendarDays size={16} className="shrink-0" />
+              <span className="truncate">{dueDateFilter.start || dueDateFilter.end ? [dueDateFilter.start, dueDateFilter.end].filter(Boolean).map(date => date.split("-").reverse().join("/")).join(" \u2192 ") : "Due date / range"}</span>
+            </button>
+            {dateFilterOpen && <div ref={datePopupRef} id="board-date-range" role="group" aria-label="Due date range" className="board-date-options absolute right-0 top-full z-40 mt-2 w-[280px] max-w-[calc(100vw-48px)] rounded-xl border p-3 shadow-xl">
+              <label className="block text-xs font-semibold">Start date<input aria-label="Start date" type="date" value={dateDraft.start} onChange={event => { setDateDraft(draft => ({ ...draft, start: event.target.value })); setDateFilterError(""); }} className="mt-1 h-10 w-full rounded-lg border px-2 text-sm" /></label>
+              <label className="mt-3 block text-xs font-semibold">End date<input aria-label="End date" type="date" value={dateDraft.end} onChange={event => { setDateDraft(draft => ({ ...draft, end: event.target.value })); setDateFilterError(""); }} className="mt-1 h-10 w-full rounded-lg border px-2 text-sm" /></label>
+              <p className="mt-2 text-xs opacity-70">One date matches that day. Two dates include both endpoints.</p>
+              {dateFilterError && <p role="alert" className="mt-2 text-xs">{dateFilterError}</p>}
+              <div className="mt-3 flex justify-between gap-2">
+                <button type="button" className="rounded-lg border px-3 py-1.5 text-sm" onClick={() => { setDateDraft({ start: "", end: "" }); setDueDateFilter({ start: "", end: "" }); setDateFilterError(""); }}>Clear</button>
+                <button type="button" className="board-date-apply rounded-lg px-4 py-1.5 text-sm font-semibold" onClick={() => { if (dateDraft.start && dateDraft.end && dateDraft.start > dateDraft.end) { setDateFilterError("End date must be on or after start date."); return; } setDueDateFilter({ ...dateDraft }); setDateFilterOpen(false); }}>Done</button>
+              </div>
+            </div>}
           </div>
 
-          <div className="flex items-center rounded-lg border border-[#DCE5EC] bg-gradient-to-br from-white to-[#F8FBFD] px-2 lg:w-[250px]">
-            <UserRound size={16} className="ml-1 shrink-0 text-slate-400" />
-            <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className="h-11 min-w-0 flex-1 bg-transparent px-2 text-sm font-medium text-slate-700 outline-none">
-              <option value="">All Employees / Assignees</option>
-              {assigneeOptions.map(([id, name]) => (
-                <option key={id} value={String(id)}>{name}</option>
-              ))}
-            </select>
-          </div>
+          <EmployeeFilter value={assigneeFilter} onChange={setAssigneeFilter} />
         </div>
 
         {boards.length === 0 ? (
@@ -856,8 +877,8 @@ export default function BoardsPage() {
             ) : "No boards found in the database."}
           </div>
         ) : (
-          <div className={`theme-board-canvas ${isCreative ? "mb-16" : ""} min-h-0 flex-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-[#DCE6EF]/90 p-3 pb-4 shadow-inner backdrop-blur-sm`} ref={scrollContainerRef}>
-            <div className="flex h-full min-w-max items-stretch gap-3">
+          <div className={`theme-board-canvas mb-16 min-h-0 flex-1 overflow-x-auto rounded-2xl border border-slate-200/80 bg-[#DCE6EF]/90 p-2 shadow-inner backdrop-blur-sm`} ref={scrollContainerRef}>
+            <div className="flex h-full w-full items-stretch gap-2.5">
               {displayWorkflow.map((stage) => {
                 const Icon = stageIcons[stage.name as keyof typeof stageIcons] ?? CircleDot;
                 const stageTasks = boardTasks.filter((task) => stage.stageIds.includes(Number(task.stage_id)));
@@ -879,9 +900,9 @@ export default function BoardsPage() {
                       if (taskId) moveTask(taskId, stage.id);
                       setDraggedTaskId(null); setDropStageId(null);
                     }}
-                    className={`theme-column flex h-full max-h-full ${isCreative ? "min-w-[260px] flex-1" : "w-[285px] shrink-0"} flex-col rounded-2xl border border-[#DCE5EC] bg-gradient-to-br from-white to-[#F8FBFD]/95 p-3 shadow-xl shadow-slate-950/10`}
+                    className={`theme-column flex h-full max-h-full min-w-[220px] max-w-[300px] flex-[1_0_220px] flex-col rounded-2xl border border-[#DCE5EC] bg-gradient-to-br from-white to-[#F8FBFD]/95 p-2 shadow-xl shadow-slate-950/10`}
                   >
-                    <div className="mb-2.5 flex items-center gap-2 px-1">
+                    <div className="mb-2 flex items-center gap-2 px-1">
                       <Icon size={16} className="text-slate-600" />
                       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800">{stage.name} ({stageTasks.length})</h2>
                       {!stage.is_system && canManageBoards ? (
@@ -896,7 +917,7 @@ export default function BoardsPage() {
                       ) : null}
                     </div>
 
-                    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                       {stageTasks.map((task) => (
                         <article
                           key={task.id}
@@ -910,33 +931,33 @@ export default function BoardsPage() {
                           onDragStart={(event) => handleDragStart(event, task.id)}
                           onDragEnd={() => { setDraggedTaskId(null); setDropStageId(null); }}
                           data-due={getDueState(task)}
-                          className={`theme-task cursor-pointer rounded-xl border border-l-4 p-3.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-[#1B4A6C] hover:shadow-[0_10px_24px_rgba(15,23,42,0.10)] ${priorityBorderClass[task.priority]} ${getDueState(task) === "overdue" ? "!border-[#D2AA5D] bg-[#FFF9EE] shadow-[0_8px_20px_rgba(11,39,64,0.07)]" : getDueState(task) === "today" ? "!border-[#7EA8C3] bg-[#F2F8FB] shadow-[0_8px_20px_rgba(11,39,64,0.07)]" : "border-[#CADBE5] bg-gradient-to-br from-[#FCFDFE] to-[#EEF5F8] shadow-[0_8px_20px_rgba(11,39,64,0.07)]"}`}
+                          className={`theme-task cursor-pointer rounded-xl border border-l-4 p-2.5 shadow-[0_4px_16px_rgba(15,23,42,0.06)] transition duration-200 hover:-translate-y-0.5 hover:border-[#1B4A6C] hover:shadow-[0_10px_24px_rgba(15,23,42,0.10)] ${priorityBorderClass[task.priority]} border-[#CADBE5] bg-gradient-to-br from-[#FCFDFE] to-[#EEF5F8] shadow-[0_8px_20px_rgba(11,39,64,0.07)]`}
                         >
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span
-                              data-priority={task.priority} className={`theme-priority inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold ${priorityClass[task.priority]}`}
+                              data-priority={task.priority} className={`theme-priority inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${priorityClass[task.priority]}`}
                             >
                               {task.priority}
                             </span>
 
                             {isTaskCreator(user.id, task.created_by) ? (
-                              <span className="inline-flex rounded-full border border-[#C9DCE9] bg-[#EDF5FA] px-2 py-1 text-[10px] font-semibold text-[#1B557A]">
+                              <span className="inline-flex rounded-full border border-[#C9DCE9] bg-[#EDF5FA] px-2 py-0.5 text-[10px] font-semibold text-[#1B557A]">
                                 Created by you
                               </span>
                             ) : null}
                           </div>
 
-                          <h3 className="mt-2.5 text-sm font-semibold leading-5 text-slate-900">
+                          <h3 className="mt-1.5 text-sm font-semibold leading-5 text-slate-900">
                             {task.title}
                           </h3>
 
                           {task.created_by_name && !isTaskCreator(user.id, task.created_by) ? (
-                            <p className="mt-1.5 truncate text-[11px] text-slate-500">
+                            <p className="mt-1 truncate text-[11px] text-slate-500">
                               Created by {task.created_by_name}
                             </p>
                           ) : null}
 
-                          <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-slate-500">
+                          <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t pt-2 text-[11px] text-slate-500">
                             <span className="flex items-center gap-1">
                               <CalendarDays size={13} />
                               {task.due_date
@@ -947,7 +968,7 @@ export default function BoardsPage() {
                               {task.assignees?.length > 0 && (
                                 <div className="flex -space-x-1.5">
                                   {task.assignees.map((a) => (
-                                    <UserAvatar key={a.id} user={a} size={34} />
+                                    <UserAvatar key={a.id} user={a} size={24} />
                                   ))}
                                 </div>
                               )}
@@ -958,7 +979,7 @@ export default function BoardsPage() {
                       ))}
 
                       {stageTasks.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-[#C9B36C] bg-white p-5 text-center text-xs text-slate-400">
+                        <div className="rounded-xl border border-dashed border-[#C9B36C] bg-white p-3 text-center text-xs text-slate-400">
                           No tasks
                         </div>
                       ) : null}
@@ -969,7 +990,7 @@ export default function BoardsPage() {
                       <button
                         type="button"
                         onClick={() => toggleTaskCreator(stage.id)}
-                        className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white/80 px-3 text-sm font-semibold text-slate-700 transition hover:border-[#B9944F] hover:bg-[#FFFDF8] hover:text-[#173F5E]"
+                        className="mt-2 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white/80 px-3 text-sm font-semibold text-slate-700 transition hover:border-[#B9944F] hover:bg-[#FFFDF8] hover:text-[#173F5E]"
                       >
                         <Plus size={16} />
                         {showCreate && createStageId === stage.id ? "Close Add Task" : "Add Task"}
@@ -980,8 +1001,8 @@ export default function BoardsPage() {
               })}
 
               {canManageBoards && selectedBoardId && isCreative ? (
-                <div className="flex w-[130px] shrink-0 flex-col items-center gap-2 self-start pt-16">
-                  <button type="button" onClick={() => void createList()} className="theme-gold flex h-14 w-full items-center justify-center gap-2 rounded-xl border px-3 text-xs font-semibold shadow-md">
+                <div className="theme-add-list-actions flex shrink-0 flex-col items-start self-center gap-2">
+                  <button type="button" onClick={() => void createList()} className="theme-add-list-button flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2">
                     <Plus size={17}/>Add List
                   </button>
                   {selectedCreativeList ? <div className="flex gap-2">
@@ -995,7 +1016,7 @@ export default function BoardsPage() {
                 <button
                   type="button"
                   onClick={createList}
-                  className="theme-gold flex h-12 w-[210px] shrink-0 items-center justify-center gap-2 self-start rounded-xl border border-blue-300/40 bg-gradient-to-r from-[#12344F] to-[#17618A] px-4 text-sm font-semibold text-white shadow-md transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                  className="theme-add-list-button flex h-11 shrink-0 items-center justify-center gap-2 self-center rounded-xl px-4 text-sm font-semibold transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
                   <Plus size={17} />
                   Add List

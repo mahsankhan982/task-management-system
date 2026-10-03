@@ -409,6 +409,8 @@ export default function RealTaskModal({
   );
 
   const currentStageName = normalizeStageName(task?.stage_name);
+  const selectableStages = workflow.filter(stage => stage.name !== "For Posting");
+  const hasLegacyStage = Boolean(stageId && workflow.length && !selectableStages.some(stage => String(stage.id) === stageId));
 
   // Workflow shortcuts are restricted to roles allowed to move tasks.
   const isStatusFlowUser = Boolean(task && canMoveTask(role, user.id, task));
@@ -1355,17 +1357,19 @@ export default function RealTaskModal({
                   Stage
                   <select
                     aria-label="Stage"
-                    value={stageId}
+                    value={hasLegacyStage ? "" : stageId}
+                    ref={element => { if (element && hasLegacyStage) element.selectedIndex = -1; }}
                     onChange={(event) => setStageId(event.target.value)}
                     disabled={!editing || !permissions.moveTask}
                     className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm normal-case text-slate-800 shadow-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 disabled:bg-slate-50"
                   >
-                    {workflow.filter(stage => !task?.is_creative || stage.name !== "For Posting" || task.stage_name === "For Posting").map((stage) => (
+                    {selectableStages.map((stage) => (
                       <option key={String(stage.id)} value={String(stage.id)}>
-                        {task?.is_creative && stage.name === "Completed" ? "Complete" : stage.name}
+                        {stage.name === "Completed" ? "Complete" : stage.name}
                       </option>
                     ))}
                   </select>
+                  {hasLegacyStage && <span className="mt-2 block text-xs font-normal normal-case">Current: {task.stage_name}. Select a workflow stage to move this task.</span>}
                 </label>
 
                 <label className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3 text-[11px] font-bold uppercase tracking-wider text-amber-700 shadow-sm">
@@ -1890,6 +1894,7 @@ export default function RealTaskModal({
                 </div>
 
                 <div
+                  data-empty={!conversationLoading && visibleComments.length === 0}
                   ref={chatScrollRef}
                   className="task-chat-scroll h-[clamp(16rem,38vh,360px)] space-y-2 overflow-y-auto scroll-smooth bg-gradient-to-b from-violet-50/50 via-slate-50 to-sky-50/60 px-3 py-3"
                   onClick={() => setOpenMessageMenuId(null)}
